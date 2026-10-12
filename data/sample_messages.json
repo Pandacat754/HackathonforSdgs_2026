@@ -1,0 +1,12 @@
+[
+    {
+        "id": "msg001",
+        "sender": "Project Manager",
+        "message": "Can you send me the final report tonight?"
+    },
+    {
+        "id": "msg002",
+        "sender": "Colleague",
+        "message": "Team lunch moved to Friday."
+    }
+]
