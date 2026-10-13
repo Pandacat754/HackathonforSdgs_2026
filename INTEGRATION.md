@@ -5,16 +5,25 @@
 1. 在团队仓库的 `feature/ai-agent` 分支中，将本包整个 `agents/` 目录放到项目根目录，
    替换原有两个占位函数，保留新增的 models/prompts/llm_client/__init__。
    本包不需要替换你的 app.py 或 C 的 queue 目录。
-2. 在项目根目录运行 A 的应用。B 的默认 mock 模式无外部依赖、无 API 请求。
-   原项目 requirements.txt 当前为空；运行 UI 所需 Streamlit 依赖由 A 添加。
-3. A 的原代码两个单参数调用仍兼容。推荐只做一行调整，复用同一次分类：
+2. 在项目根目录安装 `requirements.txt` 并启动 Streamlit 页面：
+
+```bash
+python -m pip install -r requirements.txt
+python -m streamlit run app.py
+```
+
+   `app.py` 会从项目目录读取 `data/sample_messages.json`。默认 mock 模式无外部依赖、
+   无 API 请求；要启用真实模型，请按 `AI_AGENT.md` 配置环境变量并显式设置
+   `SILENCER_MODE=llm`。
+3. 分类和草稿应复用同一次分析结果：
 
 ```python
 result = classify_message(msg)
-reply = generate_reply(msg, result)  # 原来是 generate_reply(msg)
+reply = generate_reply(msg, result)
 ```
 
-这样 live 模式不会为同一条消息分析两次，也避免两次结果不一致。
+不要在页面中再调用 `generate_reply(msg)` 而不传入 `result`；那会再次调用模型。
+Streamlit 页面会在 session state 中保留分析结果，避免交互 rerun 后结果消失。
 
 ## A 需要呈现的状态
 
@@ -24,7 +33,8 @@ reply = generate_reply(msg, result)  # 原来是 generate_reply(msg)
 - `suggested_reply is None`：显示“暂无安全回复草稿，请人工处理”。
 - 加上人工确认/覆盖入口；本 B 包不实现按钮，不改变用户最终决定。
 - 展示 confidence 时写“演示置信度（未校准）”，不要解释成正确率。
-- 原页面没有完整 After-hours 开关、队列或覆盖功能，本包只提供其需要的结果数据。
+- 页面展示离线演示、模型 fallback、安全检查等状态；置信度标为未校准。
+- 页面不自动发送回复或写入队列，所有结果仍需用户确认。
 
 不要用 `classification != 'Urgent'` 判断可以排队；第三类必须单独处理：
 

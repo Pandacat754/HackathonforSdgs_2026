@@ -31,7 +31,7 @@ class AgentTests(unittest.TestCase):
         self.addCleanup(self.env.stop)
 
     def test_synthetic_scenarios(self):
-        cases = json.loads((ROOT / "data/agent_test_cases.json").read_text())
+        cases = json.loads((ROOT / "data/agent_test_cases.json").read_text(encoding="utf-8"))
         self.assertGreaterEqual(len(cases), 10)
         for case in cases:
             with self.subTest(case=case["id"]):
@@ -163,8 +163,8 @@ class AgentTests(unittest.TestCase):
         self.assertEqual(classify_message({"message": "FYI"}, mode="typo")["source"], "fallback")
 
     def test_a_original_app_call_flow(self):
-        # Exercise A's unmodified code with a lightweight display stub. This is
-        # an interface smoke test, NOT a real Streamlit/browser UI test.
+        # Exercise the app flow with a lightweight Streamlit stub. This is an
+        # interface smoke test, NOT a real browser UI test.
         project = ROOT if (ROOT / "app.py").exists() else ROOT.parent / "HackathonforSdgs_2026-main"
         if not (project / "app.py").exists():
             self.skipTest("A's original download is not alongside this delivery")
@@ -172,7 +172,9 @@ class AgentTests(unittest.TestCase):
         st = ModuleType("streamlit")
         st.title = st.subheader = lambda *args: None
         st.write = lambda value: rendered.append(value)
+        st.info = st.warning = st.error = lambda *args: None
         st.button = lambda label: True
+        st.session_state = {}
         previous = Path.cwd()
         try:
             os.chdir(project)

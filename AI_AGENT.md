@@ -28,6 +28,17 @@ python3 -m unittest discover -s tests -v
 案例 17、18 的历史/否定表述在离线版保守交人工，不代表语义 AI 的理想分类。
 其中 `expected_category` 是规则演示验收目标，不能拿来当真实模型准确率的研究数据。
 
+启动集成的 Streamlit 页面：
+
+```bash
+python3 -m pip install -r requirements.txt
+python3 -m streamlit run app.py
+```
+
+页面使用 `data/sample_messages.json`，默认离线分析；设置 `SILENCER_MODE=llm`
+并按下方配置 API 凭据后，才会调用模型。分析结果会在当前 Streamlit session
+中保留，回复草稿复用分类结果；页面不会自动发送消息或写入队列。
+
 ## 3. 文件职责
 
 | 文件 | 用途 |
@@ -40,6 +51,7 @@ python3 -m unittest discover -s tests -v
 | `demo_agent.py` | 无界面的 B 模块演示 |
 | `tests/test_agent.py` | 自动化测试与 A 调用流程兼容检查 |
 | `INTEGRATION.md` | 给 A/C 的复制和联调说明 |
+| `app.py` | Streamlit 消息分析页面，复用分类结果并在 session state 中保留分析 |
 
 ## 4. 接口
 
@@ -120,6 +132,6 @@ LLM 的理由也是模型输出，必须以普通文本展示，不应作为命�
 ## 7. 验证状态
 
 - 自动化测试覆盖 22 条合成消息、API 响应模拟、格式校验、错误降级和接口兼容。
-- 原 A 页面调用流程使用轻量显示替身验证，不等于真正启动 Streamlit 的 UI 测试。
+- Streamlit 页面可通过 `python3 -m streamlit run app.py` 启动；仍需团队进一步联调完整的队列和用户覆盖操作。
 - 已选择并适配 DeepSeek-V4.1-Flash 非思考模式，已于 2026-10-13 完成一次合成场景实测：16/16 通过（13 次模型调用 + 3 次本地安全检查），模型调用约 0.79–1.22 秒。这是小规模演示验收，不代表真实工作消息准确率。
-- 尚未实现或测试 C 的队列，完整 Streamlit UI 仍需由团队联调。
+- 尚未实现或测试 C 的队列及用户覆盖操作。
