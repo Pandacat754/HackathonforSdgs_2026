@@ -6,6 +6,7 @@ from pathlib import Path
 import unittest
 from unittest.mock import patch
 from types import ModuleType
+from contextlib import nullcontext
 
 from agents.classifier import classify_message, triage_message
 from agents.reply_generator import generate_reply, generate_suggested_reply
@@ -170,21 +171,40 @@ class AgentTests(unittest.TestCase):
             self.skipTest("A's original download is not alongside this delivery")
         rendered = []
         st = ModuleType("streamlit")
-        st.title = st.subheader = lambda *args: None
+        st.set_page_config = st.image = lambda *args, **kwargs: None
+        st.markdown = lambda value, **kwargs: rendered.append(value)
+        st.rerun = lambda: None
+        st.subheader = lambda *args: None
         st.write = lambda value: rendered.append(value)
         st.info = st.warning = st.error = lambda *args: None
-        st.button = lambda label: True
+        st.caption = st.metric = lambda *args, **kwargs: None
+        st.spinner = lambda *args, **kwargs: nullcontext()
+        st.button = lambda label, *args, **kwargs: label in {
+            "Analyze message",
+            "Analyze all messages",
+        }
+        st.columns = lambda specs, **kwargs: [
+            nullcontext() for _ in range(specs if isinstance(specs, int) else len(specs))
+        ]
+        st.container = lambda **kwargs: nullcontext()
+        st.dialog = lambda *args, **kwargs: lambda function: function
+        st.text_input = lambda *args, **kwargs: kwargs.get("value", "")
+        st.selectbox = lambda label, options, **kwargs: options[0]
         st.session_state = {}
         previous = Path.cwd()
         try:
             os.chdir(project)
             with patch.dict(sys.modules, {"streamlit": st}):
                 runpy.run_path(str(project / "app.py"), run_name="__main__")
+                runpy.run_path(str(project / "app.py"), run_name="__main__")
         finally:
             os.chdir(previous)
-        self.assertIn("Urgent", rendered)
-        self.assertIn("Non-Urgent", rendered)
-        self.assertTrue(any(isinstance(v, str) and "Automated assistant draft" in v for v in rendered))
+        self.assertTrue(any("Urgent" in str(value) for value in rendered))
+        self.assertTrue(any("Non-Urgent" in str(value) for value in rendered))
+        self.assertTrue(any("message-card-header" in str(value) for value in rendered))
+        self.assertTrue(any("urgency-badge" in str(value) for value in rendered))
+        self.assertEqual(len(st.session_state["message_analyses"]), 4)
+        self.assertIn("Automated assistant draft", str(st.session_state["message_analyses"]["msg001"]["reply"]["suggested_reply"]))
 
 
 class TransportTests(unittest.TestCase):
