@@ -92,16 +92,32 @@ st.markdown(
         border-color: #303030;
         border-radius: 22px;
     }
-    .st-key-urgent-summary {
+    @keyframes urgent-summary-appear {
+        from {
+            opacity: 0;
+            transform: translateY(0.75rem);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+    [class*="st-key-urgent-summary"] {
         border: 2px solid #303030;
         border-radius: 24px;
         padding: 1.3rem 1.5rem;
         margin: 1.5rem 0 1rem;
         text-align: center;
+        animation: urgent-summary-appear 500ms ease-out both;
     }
-    .st-key-urgent-summary h3 {
+    [class*="st-key-urgent-summary"] h3 {
         margin: 0 0 0.4rem;
         color: #146b37;
+    }
+    @media (prefers-reduced-motion: reduce) {
+        [class*="st-key-urgent-summary"] {
+            animation: none;
+        }
     }
     .st-key-urgent-message-button button {
         width: 100%;
@@ -233,16 +249,7 @@ st.markdown(
     .app-brand {
         color: #146b37;
         font-weight: 700;
-        font-size: 1.1rem;
-    }
-    div.st-key-user_name input {
-        background-color: #fff;
-        color: #000;
-        text-align: center;
-    }
-    div.st-key-user_name input::placeholder {
-        color: #000;
-        opacity: 1;
+        font-size: 1.5rem;
     }
     [data-testid="stMarkdownContainer"],
     [data-testid="stWidgetLabel"],
@@ -257,19 +264,45 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-with DATA_FILE.open("r", encoding="utf-8") as f:
-    messages = json.load(f)
-
 if "message_analyses" not in st.session_state:
     st.session_state["message_analyses"] = {}
 if "user_name" not in st.session_state:
-    st.session_state["user_name"] = "User name"
+    st.session_state["user_name"] = ""
+if "is_authenticated" not in st.session_state:
+    st.session_state["is_authenticated"] = False
 if "show_settings" not in st.session_state:
     st.session_state["show_settings"] = False
 if "font_size" not in st.session_state:
     st.session_state["font_size"] = "Regular"
 
 FONT_SIZES = {"Regular": 16, "Large": 19, "Extra large": 22}
+
+
+def is_valid_login(username, password):
+    return username == "test" and password == "1234"
+
+
+if not st.session_state["is_authenticated"]:
+    st.title("Silencer")
+    st.subheader("Log in")
+    st.caption("Sign in to review your messages.")
+    with st.form("login_form"):
+        username = st.text_input("Username", key="login_username")
+        password = st.text_input("Password", type="password", key="login_password")
+        submitted = st.form_submit_button("Log in")
+    st.info("Demo account: username `test`, password `1234`.")
+    if submitted:
+        if is_valid_login(username, password):
+            st.session_state["is_authenticated"] = True
+            st.session_state["user_name"] = username
+            st.rerun()
+        else:
+            st.error("Incorrect username or password.")
+    st.stop()
+
+with DATA_FILE.open("r", encoding="utf-8") as f:
+    messages = json.load(f)
+
 st.markdown(
     f"<style>:root {{ --app-font-size: {FONT_SIZES[st.session_state['font_size']]}px; }}</style>",
     unsafe_allow_html=True,
@@ -358,11 +391,16 @@ def urgency_color(result):
     return "#{:02x}{:02x}{:02x}".format(*rgb)
 
 
-icon_col, name_col, settings_col = st.columns([0.16, 0.70, 0.14], vertical_alignment="center")
+icon_col, name_col, settings_col = st.columns(
+    [0.16, 0.70, 0.14], vertical_alignment="center"
+)
 with icon_col:
     st.image(str(ICON_FILE), width=80)
 with name_col:
-    st.text_input("User name", key="user_name", label_visibility="collapsed")
+    st.markdown(
+        f'<div class="app-brand">Welcome, {html.escape(st.session_state["user_name"])}</div>',
+        unsafe_allow_html=True,
+    )
 with settings_col:
     if st.button("Settings", key="settings_button", use_container_width=True):
         st.session_state["show_settings"] = not st.session_state["show_settings"]
@@ -391,7 +429,7 @@ if urgent_items:
         urgent_items, key=lambda item: item[1].get("urgency_score", 0)
     )
     urgent_reply = analyses[urgent_message["id"]]["reply"]
-    with st.container(key="urgent-summary"):
+    with st.container(key=f"urgent-summary-{urgent_message['id']}"):
         st.markdown("<h3>Most urgent analyzed message</h3>", unsafe_allow_html=True)
         if st.button(
             f"{urgent_message['sender']}: {urgent_message['message']}",

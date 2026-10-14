@@ -163,6 +163,39 @@ class AgentTests(unittest.TestCase):
     def test_invalid_mode(self):
         self.assertEqual(classify_message({"message": "FYI"}, mode="typo")["source"], "fallback")
 
+    def test_login_blocks_dashboard_until_valid_credentials(self):
+        class ScriptStopped(Exception):
+            pass
+
+        project = ROOT
+        rendered = []
+        errors = []
+        st = ModuleType("streamlit")
+        st.set_page_config = lambda *args, **kwargs: None
+        st.markdown = lambda value, **kwargs: rendered.append(value)
+        st.title = st.subheader = st.caption = st.info = lambda *args, **kwargs: None
+        st.error = lambda message: errors.append(message)
+        st.form = lambda *args, **kwargs: nullcontext()
+        st.text_input = lambda label, **kwargs: {
+            "login_username": "test",
+            "login_password": "wrong",
+        }[kwargs["key"]]
+        st.form_submit_button = lambda *args, **kwargs: True
+        st.stop = lambda: (_ for _ in ()).throw(ScriptStopped())
+        st.session_state = {}
+        previous = Path.cwd()
+        try:
+            os.chdir(project)
+            with patch.dict(sys.modules, {"streamlit": st}):
+                with self.assertRaises(ScriptStopped):
+                    runpy.run_path(str(project / "app.py"), run_name="__main__")
+        finally:
+            os.chdir(previous)
+
+        self.assertFalse(st.session_state["is_authenticated"])
+        self.assertIn("Incorrect username or password.", errors)
+        self.assertFalse(any('<div class="message-count-table">' in str(value) for value in rendered))
+
     def test_a_original_app_call_flow(self):
         # Exercise the app flow with a lightweight Streamlit stub. This is an
         # interface smoke test, NOT a real browser UI test.
@@ -190,15 +223,19 @@ class AgentTests(unittest.TestCase):
         st.dialog = lambda *args, **kwargs: lambda function: function
         st.text_input = lambda *args, **kwargs: kwargs.get("value", "")
         st.selectbox = lambda label, options, **kwargs: options[0]
-        st.session_state = {}
+        st.session_state = {"is_authenticated": True, "user_name": "test"}
         previous = Path.cwd()
         try:
             os.chdir(project)
             with patch.dict(sys.modules, {"streamlit": st}):
                 runpy.run_path(str(project / "app.py"), run_name="__main__")
-                runpy.run_path(str(project / "app.py"), run_name="__main__")
+                app_namespace = runpy.run_path(str(project / "app.py"), run_name="__main__")
         finally:
             os.chdir(previous)
+        self.assertTrue(app_namespace["is_valid_login"]("test", "1234"))
+        self.assertFalse(app_namespace["is_valid_login"]("test", "wrong"))
+        self.assertFalse(app_namespace["is_valid_login"]("other", "1234"))
+        self.assertTrue(any("Welcome, test" in str(value) for value in rendered))
         self.assertTrue(any("Urgent" in str(value) for value in rendered))
         self.assertTrue(any("Non-Urgent" in str(value) for value in rendered))
         self.assertTrue(any("message-card-header" in str(value) for value in rendered))
