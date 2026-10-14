@@ -7,6 +7,7 @@ import streamlit as st
 
 from agents.classifier import classify_message
 from agents.reply_generator import generate_reply
+from morning_queue import get_queue
 
 APP_DIR = Path(__file__).resolve().parent
 DATA_FILE = APP_DIR / "data" / "sample_messages.json"
@@ -92,18 +93,34 @@ st.markdown(
         border-color: #303030;
         border-radius: 22px;
     }
-    .st-key-urgent-summary {
+    @keyframes urgent-summary-appear {
+        from {
+            opacity: 0;
+            transform: translateY(0.75rem);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+    .st-key-tonight-summary {
         border: 2px solid #303030;
         border-radius: 24px;
         padding: 1.3rem 1.5rem;
         margin: 1.5rem 0 1rem;
         text-align: center;
+        animation: urgent-summary-appear 500ms ease-out both;
     }
-    .st-key-urgent-summary h3 {
+    .st-key-tonight-summary h3 {
         margin: 0 0 0.4rem;
-        color: #146b37;
+        color: #b02a37;
     }
-    .st-key-urgent-message-button button {
+    @media (prefers-reduced-motion: reduce) {
+        .st-key-tonight-summary {
+            animation: none;
+        }
+    }
+    [class*="st-key-tonight-message-"] button {
         width: 100%;
         min-height: 3rem;
         border: 0;
@@ -112,9 +129,9 @@ st.markdown(
         white-space: normal;
         overflow-wrap: anywhere;
     }
-    .st-key-urgent-message-button button:hover {
+    [class*="st-key-tonight-message-"] button:hover {
         border: 0;
-        color: #146b37;
+        color: #b02a37;
         background: #f7f7f7;
     }
     [class*="st-key-message-card-"] {
@@ -233,16 +250,7 @@ st.markdown(
     .app-brand {
         color: #146b37;
         font-weight: 700;
-        font-size: 1.1rem;
-    }
-    div.st-key-user_name input {
-        background-color: #fff;
-        color: #000;
-        text-align: center;
-    }
-    div.st-key-user_name input::placeholder {
-        color: #000;
-        opacity: 1;
+        font-size: 1.5rem;
     }
     [data-testid="stMarkdownContainer"],
     [data-testid="stWidgetLabel"],
@@ -257,28 +265,56 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-with DATA_FILE.open("r", encoding="utf-8") as f:
-    messages = json.load(f)
-
 if "message_analyses" not in st.session_state:
     st.session_state["message_analyses"] = {}
 if "user_name" not in st.session_state:
-    st.session_state["user_name"] = "User name"
+    st.session_state["user_name"] = ""
+if "is_authenticated" not in st.session_state:
+    st.session_state["is_authenticated"] = False
 if "show_settings" not in st.session_state:
     st.session_state["show_settings"] = False
 if "font_size" not in st.session_state:
     st.session_state["font_size"] = "Regular"
+if "human_review_decisions" not in st.session_state:
+    st.session_state["human_review_decisions"] = {}
 
 FONT_SIZES = {"Regular": 16, "Large": 19, "Extra large": 22}
+
+
+def is_valid_login(username, password):
+    return username == "test" and password == "1234"
+
+
+if not st.session_state["is_authenticated"]:
+    st.title("Silencer")
+    st.subheader("Log in")
+    st.caption("Sign in to review your messages.")
+    with st.form("login_form"):
+        username = st.text_input("Username", key="login_username")
+        password = st.text_input("Password", type="password", key="login_password")
+        submitted = st.form_submit_button("Log in")
+    st.info("Demo account: username `test`, password `1234`.")
+    if submitted:
+        if is_valid_login(username, password):
+            st.session_state["is_authenticated"] = True
+            st.session_state["user_name"] = username
+            st.rerun()
+        else:
+            st.error("Incorrect username or password.")
+    st.stop()
+
+with DATA_FILE.open("r", encoding="utf-8") as f:
+    messages = json.load(f)
+queued_messages = get_queue(
+    messages,
+    st.session_state["message_analyses"],
+    st.session_state["human_review_decisions"],
+)
+
 st.markdown(
     f"<style>:root {{ --app-font-size: {FONT_SIZES[st.session_state['font_size']]}px; }}</style>",
     unsafe_allow_html=True,
 )
-
-
-@st.dialog("Urgent message", width="medium")
-def show_urgent_message(message, result, reply):
-    show_message_details_content(message, {"result": result, "reply": reply})
 
 
 @st.dialog("Message details", width="medium")
@@ -291,6 +327,7 @@ def show_message_details(message, analysis):
             "result": result,
             "reply": reply,
         }
+        st.session_state["human_review_decisions"].pop(message["id"], None)
         st.rerun()
 
 
@@ -330,6 +367,21 @@ def show_message_details_content(message, analysis):
                 f'{html.escape(str(reply["suggested_reply"]))}</p>'
             )
 
+    category_key = analysis["result"].get("category") if analysis else None
+    if category_key == "urgent":
+        queue_footer = "Urgent: handle this tonight. It is not in the morning review queue."
+    elif category_key == "wait_until_morning":
+        queue_footer = "This non-urgent message appears in morning review automatically. No reply has been sent."
+    elif category_key == "needs_human_review":
+        decision = st.session_state["human_review_decisions"].get(message["id"])
+        if decision is True:
+            queue_footer = "You chose morning review for this message. No reply has been sent."
+        elif decision is False:
+            queue_footer = "You chose to handle this tonight. It appears in Tonight's attention, not morning review. No reply has been sent."
+        else:
+            queue_footer = "Needs your decision before it can enter morning review. No reply has been sent."
+    else:
+        queue_footer = "Analyze this message to decide whether it belongs in morning review."
     st.markdown(
         '<div class="popup-header">'
         f'<div><strong>Case ID:</strong> {message_id}</div>'
@@ -342,7 +394,7 @@ def show_message_details_content(message, analysis):
         f'<p><strong>Received at: </strong>{received_at}</p>'
         f'<p class="popup-message"><strong>Message: </strong>{full_message}</p>'
         f'{extra_content}'
-        '<p>User confirmation is required. Nothing is sent or added to a queue.</p>'
+        f'<p>{queue_footer}</p>'
         '</div>',
         unsafe_allow_html=True,
     )
@@ -358,11 +410,16 @@ def urgency_color(result):
     return "#{:02x}{:02x}{:02x}".format(*rgb)
 
 
-icon_col, name_col, settings_col = st.columns([0.16, 0.70, 0.14], vertical_alignment="center")
+icon_col, name_col, settings_col = st.columns(
+    [0.16, 0.70, 0.14], vertical_alignment="center"
+)
 with icon_col:
     st.image(str(ICON_FILE), width=80)
 with name_col:
-    st.text_input("User name", key="user_name", label_visibility="collapsed")
+    st.markdown(
+        f'<div class="app-brand">Welcome, {html.escape(st.session_state["user_name"])}</div>',
+        unsafe_allow_html=True,
+    )
 with settings_col:
     if st.button("Settings", key="settings_button", use_container_width=True):
         st.session_state["show_settings"] = not st.session_state["show_settings"]
@@ -377,28 +434,44 @@ if st.session_state["show_settings"]:
             key="font_size",
             help="Choose Regular, Large, or Extra large text for the app.",
         )
-        st.write("API credentials are not displayed here. Replies are drafts only; nothing is sent or queued.")
+        st.write("API credentials are not displayed here. Replies are drafts only and are never sent.")
 
 analyses = st.session_state["message_analyses"]
-urgent_items = [
-    (message, analyses[message["id"]]["result"])
+review_decisions = st.session_state["human_review_decisions"]
+tonight_items = [
+    message
     for message in messages
     if message["id"] in analyses
-    and analyses[message["id"]]["result"].get("category") == "urgent"
-]
-if urgent_items:
-    urgent_message, urgent_result = max(
-        urgent_items, key=lambda item: item[1].get("urgency_score", 0)
+    and (
+        analyses[message["id"]]["result"].get("category") == "urgent"
+        or (
+            analyses[message["id"]]["result"].get("category") == "needs_human_review"
+            and review_decisions.get(message["id"]) is False
+        )
     )
-    urgent_reply = analyses[urgent_message["id"]]["reply"]
-    with st.container(key="urgent-summary"):
-        st.markdown("<h3>Most urgent analyzed message</h3>", unsafe_allow_html=True)
-        if st.button(
-            f"{urgent_message['sender']}: {urgent_message['message']}",
-            key="urgent-message-button",
-            use_container_width=True,
-        ):
-            show_urgent_message(urgent_message, urgent_result, urgent_reply)
+]
+if tonight_items:
+    tonight_items.sort(
+        key=lambda message: analyses[message["id"]]["result"].get("urgency_score", 0),
+        reverse=True,
+    )
+    with st.container(key="tonight-summary"):
+        st.markdown(
+            f"<h3>Tonight's attention ({len(tonight_items)})</h3>",
+            unsafe_allow_html=True,
+        )
+        for tonight_message in tonight_items:
+            result = analyses[tonight_message["id"]]["result"]
+            source = (
+                "Analysis: Urgent" if result.get("category") == "urgent"
+                else "Your decision: handle tonight"
+            )
+            if st.button(
+                f"{source} · {tonight_message['sender']}: {tonight_message['message']}",
+                key=f"tonight-message-{tonight_message['id']}",
+                use_container_width=True,
+            ):
+                show_message_details(tonight_message, analyses[tonight_message["id"]])
 
 with st.container(key="search-strip"):
     search_col, filter_col = st.columns([0.7, 0.3], vertical_alignment="center")
@@ -448,11 +521,56 @@ with st.container(key="message-count-grid"):
                     result = classify_message(message)
                     reply = generate_reply(message, result)
                     analyses[message["id"]] = {"result": result, "reply": reply}
+                    st.session_state["human_review_decisions"].pop(message["id"], None)
             st.rerun()
 if os.environ.get("SILENCER_MODE", "mock") == "llm" and unanalyzed_messages:
     st.caption(
         "Analyze all makes one model request per unanalyzed message and may incur API charges."
     )
+
+review_items = [
+    message for message in messages
+    if message["id"] in analyses
+    and analyses[message["id"]]["result"].get("category") == "needs_human_review"
+]
+if review_items:
+    st.subheader(f"Needs human review ({len(review_items)})")
+    st.caption("Choose whether each message can wait until morning. No reply is sent.")
+    for review_message in review_items:
+        review_id = review_message["id"]
+        decision = st.session_state["human_review_decisions"].get(review_id)
+        with st.container(border=True):
+            st.write(f"{review_message['sender']}: {review_message['message']}")
+            st.caption(analyses[review_id]["result"]["reason"])
+            if decision is True:
+                st.success("Your choice: review in the morning")
+            elif decision is False:
+                st.warning("Your choice: handle tonight")
+            morning_col, tonight_col = st.columns(2)
+            with morning_col:
+                if st.button("Yes, review in morning", key=f"review-morning-{review_id}"):
+                    st.session_state["human_review_decisions"][review_id] = True
+                    st.rerun()
+            with tonight_col:
+                if st.button("No, handle tonight", key=f"review-tonight-{review_id}"):
+                    st.session_state["human_review_decisions"][review_id] = False
+                    st.rerun()
+
+st.subheader(f"Morning review queue ({len(queued_messages)})")
+st.caption("Non-urgent messages appear automatically; human-review messages appear only if you choose morning. No replies are sent.")
+if not queued_messages:
+    st.info("No messages in morning review yet. Analyze messages to build the list.")
+else:
+    for queued_message in queued_messages:
+        with st.container(border=True):
+            st.markdown(f"**{html.escape(queued_message['sender'])}**")
+            st.write(queued_message["message"])
+            st.caption(f"Category: {queued_message['classification']}")
+            if queued_message["category"] == "needs_human_review":
+                st.caption("Added after your decision; AI classification remains Needs Human Review.")
+            st.caption(
+                f"Received: {queued_message.get('received_at') or 'Not provided'}"
+            )
 
 filter_categories = {
     "Urgent": "urgent",
@@ -510,6 +628,7 @@ for message in visible_messages:
                 result = classify_message(message)
                 reply = generate_reply(message, result)
                 analyses[message["id"]] = {"result": result, "reply": reply}
+                st.session_state["human_review_decisions"].pop(message["id"], None)
                 st.rerun()
         with details_col:
             if st.button("View details", key=f"view-details-{message_id}"):
