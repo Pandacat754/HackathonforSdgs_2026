@@ -170,17 +170,22 @@ class AgentTests(unittest.TestCase):
         project = ROOT
         rendered = []
         errors = []
+        input_options = []
+        button_labels = []
+        form_options = []
         st = ModuleType("streamlit")
         st.set_page_config = lambda *args, **kwargs: None
         st.markdown = lambda value, **kwargs: rendered.append(value)
+        st.image = lambda *args, **kwargs: None
         st.title = st.subheader = st.caption = st.info = lambda *args, **kwargs: None
         st.error = lambda message: errors.append(message)
-        st.form = lambda *args, **kwargs: nullcontext()
-        st.text_input = lambda label, **kwargs: {
-            "login_username": "test",
-            "login_password": "wrong",
-        }[kwargs["key"]]
-        st.form_submit_button = lambda *args, **kwargs: True
+        st.container = lambda **kwargs: nullcontext()
+        st.form = lambda *args, **kwargs: form_options.append(kwargs) or nullcontext()
+        st.text_input = lambda label, **kwargs: (
+            input_options.append((label, kwargs))
+            or {"login_username": "test", "login_password": "wrong"}[kwargs["key"]]
+        )
+        st.form_submit_button = lambda label, **kwargs: button_labels.append(label) or True
         st.stop = lambda: (_ for _ in ()).throw(ScriptStopped())
         st.session_state = {}
         previous = Path.cwd()
@@ -194,6 +199,24 @@ class AgentTests(unittest.TestCase):
 
         self.assertFalse(st.session_state["is_authenticated"])
         self.assertIn("Incorrect username or password.", errors)
+        self.assertIn("Sign In", button_labels)
+        self.assertEqual(form_options, [{"enter_to_submit": False, "border": False}])
+        self.assertEqual(input_options[1][1]["type"], "password")
+        self.assertTrue(any("Silencer logo" in str(value) for value in rendered))
+        self.assertTrue(any("Silence the noise. Surface what matters." in str(value) for value in rendered))
+        self.assertTrue(any("AI-powered message analysis" in str(value) for value in rendered))
+        self.assertTrue(any("Welcome Back" in str(value) for value in rendered))
+        self.assertTrue(any("Sign in to review your messages." in str(value) for value in rendered))
+        self.assertTrue(any(
+            "text-align: center !important" in str(value)
+            and ".st-key-login-card p.login-description" in str(value)
+            for value in rendered
+        ))
+        self.assertFalse(any("prioritized messages" in str(value) for value in rendered))
+        self.assertFalse(any("Demo Account" in str(value) for value in rendered))
+        self.assertFalse(any("Username: test" in str(value) for value in rendered))
+        self.assertTrue(any("width: min(100%, 560px)" in str(value) for value in rendered))
+        self.assertTrue(any('font-size: 3rem' in str(value) for value in rendered))
         self.assertFalse(any('<div class="message-count-table">' in str(value) for value in rendered))
 
     def test_a_original_app_call_flow(self):
@@ -203,6 +226,7 @@ class AgentTests(unittest.TestCase):
         if not (project / "app.py").exists():
             self.skipTest("A's original download is not alongside this delivery")
         rendered = []
+        button_labels = []
         st = ModuleType("streamlit")
         st.set_page_config = st.image = lambda *args, **kwargs: None
         st.markdown = lambda value, **kwargs: rendered.append(value)
@@ -212,16 +236,25 @@ class AgentTests(unittest.TestCase):
         st.info = st.warning = st.error = lambda *args: None
         st.caption = st.metric = lambda *args, **kwargs: None
         st.spinner = lambda *args, **kwargs: nullcontext()
-        st.button = lambda label, *args, **kwargs: label in {
-            "Analyze message",
-            "Analyze all messages",
-        }
+        button_labels = []
+        text_inputs = []
+
+        def record_button(label, *args, **kwargs):
+            button_labels.append(label)
+            clicked = kwargs.get("key") == "view-details-msg001"
+            if clicked and kwargs.get("on_click"):
+                kwargs["on_click"](*kwargs.get("args", ()))
+            return clicked
+
+        st.button = record_button
         st.columns = lambda specs, **kwargs: [
             nullcontext() for _ in range(specs if isinstance(specs, int) else len(specs))
         ]
         st.container = lambda **kwargs: nullcontext()
         st.dialog = lambda *args, **kwargs: lambda function: function
-        st.text_input = lambda *args, **kwargs: kwargs.get("value", "")
+        st.text_input = lambda *args, **kwargs: (
+            text_inputs.append((args, kwargs)) or kwargs.get("value", "")
+        )
         st.selectbox = lambda label, options, **kwargs: options[0]
         st.session_state = {"is_authenticated": True, "user_name": "test"}
         previous = Path.cwd()
@@ -235,11 +268,48 @@ class AgentTests(unittest.TestCase):
         self.assertTrue(app_namespace["is_valid_login"]("test", "1234"))
         self.assertFalse(app_namespace["is_valid_login"]("test", "wrong"))
         self.assertFalse(app_namespace["is_valid_login"]("other", "1234"))
-        self.assertTrue(any("Welcome, test" in str(value) for value in rendered))
+        self.assertTrue(any("Welcome back, Test" in str(value) for value in rendered))
+        self.assertTrue(any("Silence the noise. Surface what matters." in str(value) for value in rendered))
+        self.assertTrue(any("Messages received" in str(value) for value in rendered))
+        self.assertFalse(any("AI confidence" in str(value) for value in rendered))
+        self.assertTrue(any("Action needed" in str(value) for value in rendered))
+        self.assertFalse(any("🚨" in str(value) for value in rendered))
+        self.assertFalse(any("🔎" in str(value) for value in rendered))
+        self.assertTrue(any(
+            ".st-key-search-strip" in str(value)
+            and "background: transparent" in str(value)
+            for value in rendered
+        ))
+        self.assertTrue(any(
+            kwargs.get("key") == "message_search"
+            and kwargs.get("icon") == ":material/search:"
+            and "🔎" not in kwargs.get("placeholder", "")
+            for _, kwargs in text_inputs
+        ))
+        self.assertFalse(any("AI insights" in str(value) for value in rendered))
         self.assertTrue(any("Urgent" in str(value) for value in rendered))
-        self.assertTrue(any("Non-Urgent" in str(value) for value in rendered))
-        self.assertTrue(any("message-card-header" in str(value) for value in rendered))
-        self.assertTrue(any("urgency-badge" in str(value) for value in rendered))
+        self.assertTrue(any("badge-low" in str(value) for value in rendered))
+        self.assertTrue(any("message-topline" in str(value) for value in rendered))
+        self.assertTrue(any("category-badge" in str(value) for value in rendered))
+        self.assertTrue(any("Suggested reply" in str(value) for value in rendered))
+        self.assertTrue(any("Unread" in str(value) for value in rendered))
+        self.assertTrue(any(
+            '[class*="st-key-message-card-unread-"]' in str(value)
+            and "background: var(--surface)" in str(value)
+            and "border-left: 4px solid var(--accent)" in str(value)
+            for value in rendered
+        ))
+        self.assertTrue(any(
+            ".kpi-label" in str(value)
+            and "font-size: 1.8rem" in str(value)
+            for value in rendered
+        ))
+        self.assertNotIn("Analyze all messages", button_labels)
+        self.assertNotIn("Analyze message", button_labels)
+        self.assertNotIn("Generate reply", button_labels)
+        self.assertIn("View details", button_labels)
+        self.assertIn("Copy reply", button_labels)
+        self.assertEqual(st.session_state["read_message_ids"], {"msg001"})
         self.assertEqual(len(st.session_state["message_analyses"]), 4)
         self.assertIn("Automated assistant draft", str(st.session_state["message_analyses"]["msg001"]["reply"]["suggested_reply"]))
 
