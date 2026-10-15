@@ -20,12 +20,16 @@ Silencer aims to:
 
 ## Demo Workflow
 
-1. Analyze a sample message to show its urgency category, reason, and suggested reply draft.
-2. Add Non-Urgent messages to the morning review queue automatically.
-3. Keep Urgent messages in Tonight's attention.
-4. For Needs Human Review messages, let the user choose morning review or tonight's attention.
+1. The app analyzes all sample messages on first load and keeps the results in the current Streamlit session.
+2. Non-Urgent messages appear in the morning review queue automatically.
+3. The highest-priority urgent message is highlighted above the inbox; all messages also appear in the message list.
+4. For Needs Human Review messages, choosing "Yes, review in morning" changes the category to Non-Urgent and moves the message into the morning queue. Choosing "No, handle tonight" changes it to Urgent and makes it eligible for the highest-priority panel.
 
-The demo does not send replies or notifications.
+The highest-priority panel shows the Urgent message with the earliest valid `received_at` timestamp. Messages without a valid timestamp are considered after timestamped messages; ties retain the original message order. The app can re-analyze an individual message.
+
+Message cards show the message ID, category, urgency, sender, received time, message, suggested reply, and app name. The urgency level uses the same numeric, color-coded pill in message cards, the priority panel, and the popup. The same message keeps one read/unread state across the priority card, inbox, and morning queue, keyed by message ID. Unread cards use a blue left border. On a Needs Human Review card, **Manual reply** marks the message as replied and moves it to History. Other reply actions also resolve messages into History.
+
+The Analyzed counter shows messages not classified as Needs Human Review over the active message total. Resolving a certain message decreases both values; resolving an uncertain message decreases only the total.
 
 ## Project Structure
 
@@ -73,9 +77,12 @@ Expected Output:
 
 ```python
 {
+    "category": "urgent",
     "classification": "Urgent",
     "urgency_score": 0.95,
-    "reason": "Contains immediate deadline"
+    "reason": "The message describes a current operational or safety incident.",
+    "source": "mock",
+    "requires_user_confirmation": True
 }
 ```
 
@@ -93,8 +100,9 @@ Expected Output:
 
 ```python
 {
-    "suggested_reply":
-    "Thank you for your message. I will review it tomorrow morning."
+    "suggested_reply": "...",
+    "is_draft": True,
+    "requires_user_confirmation": True
 }
 ```
 
@@ -114,7 +122,9 @@ get_queue(messages, analyses, review_decisions)
 
 Purpose:
 
-The morning review queue automatically includes analyzed Non-Urgent messages. Needs Human Review messages are added only when the user chooses morning review; Urgent messages remain in Tonight's attention.
+The morning review queue automatically includes analyzed Non-Urgent messages. Choosing morning review converts a Needs Human Review message into Non-Urgent and adds it to the queue. In the queue, choosing "Not urgent" marks the message Confirmed and replaces the choice buttons with a checkmark. Choosing "Urgent and send reply now" changes it to Urgent and removes it from the queue. Clicking a send-reply action resolves the message, moves it from active lists into History, and decreases the active message count. For messages requiring human handling, **Manual reply** marks the message as replied, moves it into History, and decreases the active count.
+
+History uses the same message-card layout and is captioned "Review past messages here." It records messages resolved through a send-reply or Manual reply action.
 
 
 ## Running the Project

@@ -65,7 +65,7 @@ def _mock(message):
         return _decision("urgent", .85, .78, "The message explicitly requests action tonight or before tomorrow morning.")
     if deferred:
         return _decision("wait_until_morning", .15, .85, "The message is informational or explicitly allows later review.")
-    return _decision("needs_human_review", .5, .4, "There is not enough clear context for the offline demo rules.")
+    return _decision("needs_human_review", .5, .4, "There is not enough clear context for a confident classification.")
 
 
 def _draft(style, message, policy):
@@ -75,10 +75,10 @@ def _draft(style, message, policy):
     if style == "none":
         return None
     if style == "deferred":
-        return ("自动助手回复草稿：此消息可留待下一个工作时段查看；本人尚未阅读或接受此请求。"
-                if zh else "Automated assistant draft: This message can be held for the next working period. The recipient has not yet reviewed or accepted the request.")
-    return ("自动助手回复草稿：此消息已由助手接收；本人尚未阅读或承诺采取行动。"
-            if zh else "Automated assistant draft: This message has reached the assistant. The recipient has not yet reviewed it or committed to any action.")
+        return ("此消息可留待下一个工作时段查看；本人尚未阅读或接受此请求。"
+                if zh else "This message can be held for the next working period. The recipient has not yet reviewed or accepted the request.")
+    return ("此消息已由助手接收；本人尚未阅读或承诺采取行动。"
+            if zh else "This message has reached the assistant. The recipient has not yet reviewed it or committed to any action.")
 
 
 def _result(message, policy, decision, source, error_code=None):
@@ -113,7 +113,7 @@ def _fallback(message, policy, reason, code):
 def classify_message(message, user_policy=None, *, mode=None):
     """Return a dict compatible with A; never send, notify or enqueue anything.
 
-    mode='mock' (default): offline rules, clearly labelled in source/reason.
+    mode='mock' (default): built-in classification rules.
     mode='llm': configured API; any failure -> human review, never silent mock.
     """
     try:
@@ -132,7 +132,6 @@ def classify_message(message, user_policy=None, *, mode=None):
         if not clean.get("received_at") or not clean.get("user_workday_starts_at"):
             decision["confidence"] = min(decision["confidence"], .80)
         source = "mock"
-        decision["reason"] = "[Offline demo] " + decision["reason"]
     else:
         try:
             decision = parse_decision(llm_client.complete(build_messages(clean, policy)))

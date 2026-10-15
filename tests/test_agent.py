@@ -7,6 +7,7 @@ import unittest
 from unittest.mock import patch
 from types import ModuleType
 from contextlib import nullcontext
+from streamlit.testing.v1 import AppTest
 
 from agents.classifier import classify_message, triage_message
 from agents.reply_generator import generate_reply, generate_suggested_reply
@@ -150,7 +151,11 @@ class AgentTests(unittest.TestCase):
             self.assertNotIn("I will", reply)
             self.assertNotIn("I’ve seen", reply)
             self.assertNotIn("已加入", reply)
-        self.assertIn("自动助手", generate_reply({"message": "FYI"}, user_policy={"reply_language": "zh"})["suggested_reply"])
+        chinese_reply = generate_reply(
+            {"message": "FYI"}, user_policy={"reply_language": "zh"}
+        )["suggested_reply"]
+        self.assertNotIn("自动助手回复草稿：", chinese_reply)
+        self.assertTrue(chinese_reply)
 
     def test_payload_is_separate_and_extra_fields_are_not_forwarded(self):
         with patch.object(llm_client, "complete", return_value=response()) as client:
@@ -200,13 +205,13 @@ class AgentTests(unittest.TestCase):
         self.assertFalse(st.session_state["is_authenticated"])
         self.assertIn("Incorrect username or password.", errors)
         self.assertIn("Sign In", button_labels)
-        self.assertEqual(form_options, [{"enter_to_submit": False, "border": False}])
+        self.assertEqual(form_options, [{"enter_to_submit": True, "border": False}])
         self.assertEqual(input_options[1][1]["type"], "password")
         self.assertTrue(any("Silencer logo" in str(value) for value in rendered))
         self.assertTrue(any("Silence the noise. Surface what matters." in str(value) for value in rendered))
         self.assertTrue(any("AI-powered message analysis" in str(value) for value in rendered))
         self.assertTrue(any("Welcome Back" in str(value) for value in rendered))
-        self.assertTrue(any("Sign in to review your messages." in str(value) for value in rendered))
+        self.assertFalse(any("Sign in to review your messages." in str(value) for value in rendered))
         self.assertTrue(any(
             "text-align: center !important" in str(value)
             and ".st-key-login-card p.login-description" in str(value)
@@ -217,6 +222,10 @@ class AgentTests(unittest.TestCase):
         self.assertFalse(any("Username: test" in str(value) for value in rendered))
         self.assertTrue(any("width: min(100%, 560px)" in str(value) for value in rendered))
         self.assertTrue(any('font-size: 3rem' in str(value) for value in rendered))
+        self.assertTrue(any(
+            ".login-brand img { width: 84px; height: 84px;" in str(value)
+            for value in rendered
+        ))
         self.assertFalse(any('<div class="message-count-table">' in str(value) for value in rendered))
 
     def test_a_original_app_call_flow(self):
@@ -227,13 +236,19 @@ class AgentTests(unittest.TestCase):
             self.skipTest("A's original download is not alongside this delivery")
         rendered = []
         button_labels = []
+        button_keys = []
+        section_titles = []
+        container_keys = []
+        images = []
         st = ModuleType("streamlit")
-        st.set_page_config = st.image = lambda *args, **kwargs: None
+        st.set_page_config = lambda *args, **kwargs: None
+        st.image = lambda *args, **kwargs: images.append((args, kwargs))
         st.markdown = lambda value, **kwargs: rendered.append(value)
         st.rerun = lambda: None
-        st.subheader = lambda *args: None
+        st.subheader = lambda *args: section_titles.append(args[0])
         st.write = lambda value: rendered.append(value)
         st.info = st.warning = st.error = lambda *args: None
+        st.success = lambda *args: None
         st.caption = st.metric = lambda *args, **kwargs: None
         st.spinner = lambda *args, **kwargs: nullcontext()
         button_labels = []
@@ -241,7 +256,8 @@ class AgentTests(unittest.TestCase):
 
         def record_button(label, *args, **kwargs):
             button_labels.append(label)
-            clicked = kwargs.get("key") == "view-details-msg001"
+            button_keys.append(kwargs.get("key"))
+            clicked = kwargs.get("key") == "urgent-hero-open"
             if clicked and kwargs.get("on_click"):
                 kwargs["on_click"](*kwargs.get("args", ()))
             return clicked
@@ -250,7 +266,12 @@ class AgentTests(unittest.TestCase):
         st.columns = lambda specs, **kwargs: [
             nullcontext() for _ in range(specs if isinstance(specs, int) else len(specs))
         ]
-        st.container = lambda **kwargs: nullcontext()
+        st.container = lambda **kwargs: (
+            container_keys.append(kwargs.get("key")) or nullcontext()
+        )
+        st.expander = lambda *args, **kwargs: (
+            section_titles.append(args[0]) or nullcontext()
+        )
         st.dialog = lambda *args, **kwargs: lambda function: function
         st.text_input = lambda *args, **kwargs: (
             text_inputs.append((args, kwargs)) or kwargs.get("value", "")
@@ -270,14 +291,46 @@ class AgentTests(unittest.TestCase):
         self.assertFalse(app_namespace["is_valid_login"]("other", "1234"))
         self.assertTrue(any("Welcome back, Test" in str(value) for value in rendered))
         self.assertTrue(any("Silence the noise. Surface what matters." in str(value) for value in rendered))
+        self.assertFalse(any("offline " + "demo" in str(value).lower() for value in rendered))
         self.assertTrue(any("Messages received" in str(value) for value in rendered))
         self.assertFalse(any("AI confidence" in str(value) for value in rendered))
-        self.assertTrue(any("Action needed" in str(value) for value in rendered))
+        self.assertTrue(any("Highest Priority Message" in str(value) for value in rendered))
+        self.assertTrue(any(
+            args[0] == project / "assets" / "icon.png"
+            and kwargs.get("alt") == "Silencer logo"
+            and kwargs.get("width") == 96
+            for args, kwargs in images
+        ))
+        self.assertTrue(any(
+            ".st-key-app-icon [data-testid=\"stImage\"] img" in str(value)
+            and "width: 104px" in str(value)
+            and "height: 104px" in str(value)
+            for value in rendered
+        ))
+        self.assertTrue(any(
+            ".brand-title" in str(value)
+            and ".login-brand-title" in str(value)
+            and "background: transparent" in str(value)
+            for value in rendered
+        ))
+        self.assertIn("Morning review queue (1)", section_titles)
         self.assertFalse(any("🚨" in str(value) for value in rendered))
         self.assertFalse(any("🔎" in str(value) for value in rendered))
         self.assertTrue(any(
             ".st-key-search-strip" in str(value)
             and "background: transparent" in str(value)
+            and "padding: 0.75rem 0 0" in str(value)
+            for value in rendered
+        ))
+        self.assertTrue(any(
+            "[data-testid=\"stExpander\"] summary p" in str(value)
+            and "font-size: 1.5rem !important" in str(value)
+            and "font-weight: 800 !important" in str(value)
+            for value in rendered
+        ))
+        self.assertTrue(any(
+            ".st-key-search-strip [data-testid=\"stTextInput\"] input" in str(value)
+            and "background: #e2e8f0" in str(value)
             for value in rendered
         ))
         self.assertTrue(any(
@@ -288,11 +341,38 @@ class AgentTests(unittest.TestCase):
         ))
         self.assertFalse(any("AI insights" in str(value) for value in rendered))
         self.assertTrue(any("Urgent" in str(value) for value in rendered))
+        self.assertTrue(any(
+            ".st-key-urgent-hero-read" in str(value)
+            and "background: #fff5f5" in str(value)
+            and "border: 1px solid #ef4444" in str(value)
+            and ".hero-urgency" in str(value)
+            and "font-size: 1.05rem" in str(value)
+            and "[data-testid=\"stMarkdownContainer\"] p" in str(value)
+            and "font-size: 1.05rem !important" in str(value)
+            for value in rendered
+        ))
+        self.assertTrue(any(
+            'class="hero-urgency"' in str(value)
+            and 'class="urgency-badge"' in str(value)
+            and "Urgency level:" in str(value)
+            for value in rendered
+        ))
         self.assertTrue(any("badge-low" in str(value) for value in rendered))
-        self.assertTrue(any("message-topline" in str(value) for value in rendered))
-        self.assertTrue(any("category-badge" in str(value) for value in rendered))
-        self.assertTrue(any("Suggested reply" in str(value) for value in rendered))
-        self.assertTrue(any("Unread" in str(value) for value in rendered))
+        self.assertTrue(any("Message ID:" in str(value) for value in rendered))
+        self.assertTrue(any("Category:" in str(value) for value in rendered))
+        self.assertTrue(any("Suggested reply:" in str(value) for value in rendered))
+        urgency_badges = [
+            str(value) for value in rendered
+            if 'class="urgency-badge"' in str(value)
+        ]
+        self.assertGreaterEqual(
+            sum(
+                '<span class="urgency-badge" style="background-color:#ef4444">0.85</span>'
+                in value
+                for value in urgency_badges
+            ),
+            2,
+        )
         self.assertTrue(any(
             '[class*="st-key-message-card-unread-"]' in str(value)
             and "background: var(--surface)" in str(value)
@@ -308,10 +388,233 @@ class AgentTests(unittest.TestCase):
         self.assertNotIn("Analyze message", button_labels)
         self.assertNotIn("Generate reply", button_labels)
         self.assertIn("View details", button_labels)
+        self.assertIn("urgent-hero-open", button_keys)
+        self.assertNotIn("urgent-hero-details", button_keys)
+        self.assertIn("Send reply", button_labels)
         self.assertIn("Copy reply", button_labels)
+        msg001_card_keys = [
+            key for key in container_keys
+            if key and key.endswith("-msg001")
+        ]
+        self.assertTrue(any("inbox" in key for key in msg001_card_keys))
+        self.assertTrue(any(key == "urgent-hero-unread" for key in container_keys))
+        msg002_card_keys = {
+            key for key in container_keys
+            if key and key.endswith("-msg002")
+            and ("morning-queue" in key or "inbox" in key)
+        }
+        self.assertEqual(len(msg002_card_keys), 2)
+        self.assertTrue(all("message-card-unread-" in key for key in msg002_card_keys))
         self.assertEqual(st.session_state["read_message_ids"], {"msg001"})
         self.assertEqual(len(st.session_state["message_analyses"]), 4)
-        self.assertIn("Automated assistant draft", str(st.session_state["message_analyses"]["msg001"]["reply"]["suggested_reply"]))
+        self.assertNotIn(
+            "Automated assistant draft:",
+            str(st.session_state["message_analyses"]["msg001"]["reply"]["suggested_reply"]),
+        )
+        sample_urgent_messages = [
+            {"id": "later", "received_at": "2026-10-15T22:00:00+08:00"},
+            {"id": "earlier", "received_at": "2026-10-15T20:00:00+08:00"},
+        ]
+        self.assertEqual(
+            min(sample_urgent_messages, key=app_namespace["received_at_order"])["id"],
+            "earlier",
+        )
+        self.assertEqual(
+            min(
+                [
+                    {"id": "known", "received_at": "2026-10-15T20:00:00+08:00"},
+                    {"id": "missing"},
+                ],
+                key=app_namespace["received_at_order"],
+            )["id"],
+            "known",
+        )
+        self.assertEqual(
+            app_namespace["strip_reply_label"]("Automated assistant draft: Reply text"),
+            "Reply text",
+        )
+
+    def test_morning_queue_and_inbox_share_message_read_state(self):
+        app = AppTest.from_file(str(ROOT / "app.py"), default_timeout=20)
+        app.session_state["is_authenticated"] = True
+        app.session_state["user_name"] = "test"
+        app.session_state["font_size"] = "Large"
+        app.run()
+
+        self.assertEqual(app.exception, [])
+        self.assertTrue(any("--app-font-size: 19px" in str(item.value) for item in app.markdown))
+        self.assertIn("Morning review queue (1)", [item.label for item in app.expander])
+        duplicate_cards = [
+            item.value for item in app.markdown if "msg002" in str(item.value)
+        ]
+        self.assertEqual(len(duplicate_cards), 2)
+        self.assertTrue(any("message-detail" in value for value in duplicate_cards))
+        self.assertTrue(any("message-fields" in value for value in duplicate_cards))
+
+        app.button(key="queue-not-urgent-msg002").click().run()
+        self.assertIn("msg002", app.session_state["read_message_ids"])
+        self.assertIn("msg002", app.session_state["queue_confirmed_ids"])
+        self.assertNotIn("queue-not-urgent-msg002", [button.key for button in app.button])
+        self.assertNotIn("queue-send-now-msg002", [button.key for button in app.button])
+        self.assertTrue(any("Confirmed" in str(item.value) for item in app.markdown))
+        self.assertEqual(app.exception, [])
+
+    def test_queue_urgent_action_removes_message_and_marks_it_urgent(self):
+        app = AppTest.from_file(str(ROOT / "app.py"), default_timeout=20)
+        app.session_state["is_authenticated"] = True
+        app.run()
+
+        app.button(key="queue-send-now-msg002").click().run()
+
+        result = app.session_state["message_analyses"]["msg002"]["result"]
+        self.assertEqual(result["category"], "urgent")
+        self.assertEqual(result["classification"], "Urgent")
+        self.assertEqual(app.session_state["human_review_decisions"]["msg002"], False)
+        self.assertIn("Morning review queue (0)", [item.label for item in app.expander])
+        self.assertIn("History (1)", [item.label for item in app.expander])
+        self.assertNotIn("queue-not-urgent-msg002", [button.key for button in app.button])
+        self.assertTrue(any(
+            "marked as replied and moved to History" in str(item.value)
+            for item in app.success
+        ))
+        received_count_card = next(
+            item.value for item in app.markdown
+            if "Messages received" in str(item.value)
+        )
+        self.assertIn(">3<", received_count_card)
+        analyzed_card = next(
+            item.value for item in app.markdown
+            if "Analyzed" in str(item.value)
+        )
+        certain_active = sum(
+            message_id not in app.session_state["resolved_message_ids"]
+            and analysis["result"].get("category") != "needs_human_review"
+            for message_id, analysis in app.session_state["message_analyses"].items()
+        )
+        self.assertIn(f">{certain_active}/3<", analyzed_card)
+        self.assertEqual(len(app.session_state["resolved_message_ids"]), 1)
+        self.assertEqual(app.exception, [])
+
+    def test_send_reply_moves_message_to_history_and_decrements_active_count(self):
+        app = AppTest.from_file(str(ROOT / "app.py"), default_timeout=20)
+        app.session_state["is_authenticated"] = True
+        app.run()
+
+        app.button(key="inbox-send-msg001").click().run()
+
+        self.assertIn("msg001", app.session_state["resolved_message_ids"])
+        self.assertIn("History (1)", [item.label for item in app.expander])
+        self.assertIn("Messages List (3)", [item.label for item in app.expander])
+        self.assertNotIn("inbox-send-msg001", [button.key for button in app.button])
+        self.assertTrue(any("Review past messages here." in str(item.value) for item in app.caption))
+        self.assertTrue(any("Replied" in str(item.value) for item in app.markdown))
+        self.assertTrue(any(
+            "message-fields" in str(item.value) and "msg001" in str(item.value)
+            for item in app.markdown
+        ))
+        received_count_card = next(
+            item.value for item in app.markdown
+            if "Messages received" in str(item.value)
+        )
+        self.assertIn(">3<", received_count_card)
+        analyzed_card = next(
+            item.value for item in app.markdown
+            if "Analyzed" in str(item.value)
+        )
+        certain_active = sum(
+            message_id not in app.session_state["resolved_message_ids"]
+            and analysis["result"].get("category") != "needs_human_review"
+            for message_id, analysis in app.session_state["message_analyses"].items()
+        )
+        self.assertIn(f">{certain_active}/3<", analyzed_card)
+        self.assertTrue(any(
+            "marked as replied and moved to History" in str(item.value)
+            for item in app.success
+        ))
+        self.assertEqual(app.exception, [])
+
+    def test_resolving_uncertain_message_only_decrements_total(self):
+        app = AppTest.from_file(str(ROOT / "app.py"), default_timeout=20)
+        app.session_state["is_authenticated"] = True
+        app.run()
+
+        result = app.session_state["message_analyses"]["msg003"]["result"]
+        result.update(
+            category="needs_human_review",
+            classification="Needs Human Review",
+        )
+        certain_before_resolve = sum(
+            analysis["result"].get("category") != "needs_human_review"
+            for analysis in app.session_state["message_analyses"].values()
+        )
+        app.session_state["resolved_message_ids"].add("msg003")
+        app.run()
+
+        analyzed_card = next(
+            item.value for item in app.markdown
+            if "Analyzed" in str(item.value)
+        )
+        self.assertIn(f">{certain_before_resolve}/3<", analyzed_card)
+        self.assertEqual(app.exception, [])
+
+    def test_manual_reply_resolves_human_review_message_to_history(self):
+        app = AppTest.from_file(str(ROOT / "app.py"), default_timeout=20)
+        app.session_state["is_authenticated"] = True
+        app.run()
+
+        review_count_before = int(
+            next(
+                item.label for item in app.expander
+                if item.label.startswith("Needs human review (")
+            ).split("(")[1].rstrip(")")
+        )
+        manual_reply = app.button(key="human-review-send-msg003")
+        self.assertEqual(manual_reply.label, "Manual reply")
+        self.assertFalse(manual_reply.disabled)
+        manual_reply.click().run()
+
+        self.assertIn("msg003", app.session_state["resolved_message_ids"])
+        self.assertIn(
+            f"Needs human review ({review_count_before - 1})",
+            [item.label for item in app.expander],
+        )
+        self.assertIn("History (1)", [item.label for item in app.expander])
+        self.assertIn("Messages List (3)", [item.label for item in app.expander])
+        self.assertNotIn("human-review-send-msg003", [button.key for button in app.button])
+        self.assertTrue(any(
+            "marked as replied and moved to History" in str(item.value)
+            for item in app.success
+        ))
+        self.assertEqual(app.exception, [])
+
+    def test_human_review_choices_change_category_and_destination(self):
+        morning_app = AppTest.from_file(str(ROOT / "app.py"), default_timeout=20)
+        morning_app.session_state["is_authenticated"] = True
+        morning_app.run()
+        morning_app.button(key="review-morning-msg003").click().run()
+
+        morning_result = morning_app.session_state["message_analyses"]["msg003"]["result"]
+        self.assertEqual(morning_result["category"], "wait_until_morning")
+        self.assertEqual(morning_result["classification"], "Non-Urgent")
+        self.assertEqual(morning_result["action"], "queue_for_morning")
+        self.assertEqual(morning_app.session_state["human_review_decisions"]["msg003"], True)
+        self.assertIn("Morning review queue (2)", [item.label for item in morning_app.expander])
+        self.assertIn("Needs human review (1)", [item.label for item in morning_app.expander])
+        self.assertEqual(morning_app.exception, [])
+
+        tonight_app = AppTest.from_file(str(ROOT / "app.py"), default_timeout=20)
+        tonight_app.session_state["is_authenticated"] = True
+        tonight_app.run()
+        tonight_app.button(key="review-tonight-msg003").click().run()
+
+        urgent_result = tonight_app.session_state["message_analyses"]["msg003"]["result"]
+        self.assertEqual(urgent_result["category"], "urgent")
+        self.assertEqual(urgent_result["classification"], "Urgent")
+        self.assertEqual(urgent_result["action"], "notify_user_now")
+        self.assertEqual(tonight_app.session_state["human_review_decisions"]["msg003"], False)
+        self.assertIn("Morning review queue (1)", [item.label for item in tonight_app.expander])
+        self.assertIn("Needs human review (1)", [item.label for item in tonight_app.expander])
+        self.assertEqual(tonight_app.exception, [])
 
 
 class TransportTests(unittest.TestCase):

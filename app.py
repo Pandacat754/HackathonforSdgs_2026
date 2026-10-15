@@ -2,6 +2,7 @@ import base64
 import html
 import json
 import os
+from datetime import datetime, timezone
 from pathlib import Path
 
 import streamlit as st
@@ -27,8 +28,8 @@ st.markdown(
         --surface: #ffffff;
         --canvas: #f8fafc;
         --line: #e2e8f0;
-        --app-font-size: 16px;
     }
+    html { font-size: var(--app-font-size, 16px); }
     [data-testid="stAppViewContainer"] { background: var(--canvas); }
     [data-testid="stHeader"] { background: transparent; }
     .stMainBlockContainer {
@@ -68,9 +69,10 @@ st.markdown(
         gap: 0.7rem;
         margin-bottom: 0.3rem;
     }
-    .login-brand img { width: 46px; height: 46px; object-fit: contain; }
+    .login-brand img { width: 84px; height: 84px; object-fit: contain; }
     .login-brand-title {
         color: var(--ink);
+        background: transparent;
         font-size: 2rem;
         font-weight: 800;
         letter-spacing: -0.05em;
@@ -110,36 +112,6 @@ st.markdown(
         letter-spacing: -0.03em;
         margin: 0;
     }
-    .st-key-tonight-summary {
-        border: 2px solid #303030;
-        border-radius: 24px;
-        padding: 1.3rem 1.5rem;
-        margin: 1.5rem 0 1rem;
-        text-align: center;
-        animation: urgent-summary-appear 500ms ease-out both;
-    }
-    .st-key-tonight-summary h3 {
-        margin: 0 0 0.4rem;
-        color: #b02a37;
-    }
-    @media (prefers-reduced-motion: reduce) {
-        .st-key-tonight-summary {
-            animation: none;
-        }
-    }
-    [class*="st-key-tonight-message-"] button {
-        width: 100%;
-        min-height: 3rem;
-        border: 0;
-        background: transparent;
-        color: inherit;
-        white-space: normal;
-        overflow-wrap: anywhere;
-    }
-    [class*="st-key-tonight-message-"] button:hover {
-        border: 0;
-        color: #b02a37;
-        background: #f7f7f7;
     .login-form-subtitle { color: var(--muted); margin: 0.25rem 0 1rem; }
     .st-key-login-card [data-testid="stTextInput"] input {
         border-radius: 10px;
@@ -170,15 +142,31 @@ st.markdown(
     .stApp:has(.st-key-login-shell) [data-testid="stHeader"] { display: none; }
     [data-testid="stImage"] img { object-fit: contain; }
     .st-key-main-header {
-        background: var(--surface);
-        border: 1px solid var(--line);
-        border-radius: 16px;
+        background: transparent;
+        border: 0;
+        border-radius: 0;
         padding: 0.5rem 1rem;
         margin-bottom: 1rem;
-        box-shadow: 0 4px 18px rgba(15, 23, 42, 0.05);
+        box-shadow: none;
+    }
+    .st-key-app-icon {
+        width: 6.5rem;
+        height: 6.5rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0;
+        border: 0;
+        background: transparent;
+    }
+    .st-key-app-icon [data-testid="stImage"] img {
+        width: 104px;
+        height: 104px;
+        object-fit: contain;
     }
     .brand-title {
         color: var(--ink);
+        background: transparent;
         font-size: 3rem;
         font-weight: 750;
         letter-spacing: -0.04em;
@@ -225,14 +213,68 @@ st.markdown(
         flex-shrink: 0;
     }
     .kpi-note { color: #94a3b8; font-size: 0.77rem; flex-shrink: 0; }
-    .st-key-urgent-hero {
-        background: linear-gradient(120deg, #fff1f2 0%, #fff7ed 100%);
-        border: 1px solid #fecaca;
-        border-left: 6px solid var(--urgent);
+    .st-key-urgent-hero-read,
+    .st-key-urgent-hero-unread {
+        background: #fff5f5;
+        border: 1px solid #ef4444;
         border-radius: 18px;
         padding: 1.35rem 1.5rem;
         margin: 1.5rem 0;
-        box-shadow: 0 8px 24px rgba(239, 68, 68, 0.09);
+        box-shadow: 0 4px 14px rgba(239, 68, 68, 0.08);
+    }
+    .priority-title {
+        color: #b91c1c;
+        font-size: 1.35rem;
+        font-weight: 750;
+        margin-bottom: 0.7rem;
+    }
+    .hero-urgency {
+        color: #7f1d1d;
+        font-size: 1.05rem;
+        font-weight: 700;
+        margin-bottom: 0.55rem;
+    }
+    .hero-urgency .urgency-badge {
+        margin-left: 0.35rem;
+        font-size: 1rem;
+        padding: 0.2rem 0.65rem;
+    }
+    .st-key-urgent-hero-read [data-testid="stButton"] button,
+    .st-key-urgent-hero-unread [data-testid="stButton"] button {
+        min-height: 0;
+        height: auto;
+        justify-content: flex-start;
+        padding: 0.25rem 0;
+        border: 0;
+        background: transparent;
+        box-shadow: none;
+        color: #334155;
+        font-size: 1.05rem;
+        line-height: 1.7;
+        text-align: left;
+        white-space: pre-wrap;
+    }
+    .st-key-urgent-hero-read [data-testid="stButton"] [data-testid="stMarkdownContainer"] p,
+    .st-key-urgent-hero-unread [data-testid="stButton"] [data-testid="stMarkdownContainer"] p {
+        font-size: 1.05rem !important;
+        line-height: 1.7;
+    }
+    .st-key-urgent-hero-read [data-testid="stButton"] button > div,
+    .st-key-urgent-hero-unread [data-testid="stButton"] button > div {
+        width: 100%;
+        justify-content: flex-start;
+    }
+    .st-key-urgent-hero-read [data-testid="stButton"] [data-testid="stMarkdownContainer"],
+    .st-key-urgent-hero-unread [data-testid="stButton"] [data-testid="stMarkdownContainer"] {
+        width: 100%;
+        text-align: left;
+    }
+    .st-key-urgent-hero-read [data-testid="stButton"] button:hover,
+    .st-key-urgent-hero-unread [data-testid="stButton"] button:hover {
+        transform: none;
+        box-shadow: none;
+        background: transparent;
+        color: var(--ink);
     }
     .hero-eyebrow {
         color: #b91c1c;
@@ -248,10 +290,23 @@ st.markdown(
         background: transparent;
         border: 0;
         border-radius: 0;
-        padding: 0;
+        padding: 0.75rem 0 0;
         margin: 0.5rem 0 1.5rem;
     }
     .section-title { color: var(--ink); font-size: 1.25rem; font-weight: 750; margin: 0.3rem 0 0.9rem; }
+    [data-testid="stExpander"] summary {
+        color: #000;
+        cursor: pointer;
+    }
+    [data-testid="stExpander"] summary p {
+        color: #0f172a;
+        font-size: 1.5rem !important;
+        font-weight: 800 !important;
+    }
+    [data-testid="stExpander"] summary svg {
+        color: #000;
+        fill: #000;
+    }
     [class*="st-key-message-card-"] {
         background: var(--surface);
         border: 1px solid var(--line);
@@ -266,6 +321,17 @@ st.markdown(
         border-color: var(--line);
         border-left: 4px solid var(--accent);
     }
+    .message-fields {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 0.5rem;
+        margin-bottom: 0.55rem;
+        color: var(--ink);
+    }
+    .message-fields strong, .message-detail strong { font-weight: 750; }
+    .message-detail { margin: 0.35rem 0; overflow-wrap: anywhere; }
+    .message-actions { margin-top: 0.8rem; }
+    .queue-actions [data-testid="stButton"] button { font-size: 0.88rem; }
     [class*="st-key-message-card-"]:hover {
         transform: translateY(-2px);
         box-shadow: 0 9px 20px rgba(15, 23, 42, 0.08);
@@ -331,6 +397,12 @@ st.markdown(
         border-radius: 10px;
         border-color: #cbd5e1;
     }
+    .st-key-search-strip [data-testid="stTextInputRootElement"],
+    .st-key-search-strip [data-testid="stTextInput"] input,
+    .st-key-search-strip [data-testid="stSelectbox"] [role="group"] {
+        background: #e2e8f0;
+        color: #1f2937;
+    }
     .popup-header {
         display: grid;
         grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -384,13 +456,16 @@ st.markdown(
     }
     @media (max-width: 640px) {
         .stMainBlockContainer { padding: 0.75rem 0.7rem 1.5rem; }
-        .st-key-main-header [data-testid="stImage"] img { max-width: 64px; }
+        .st-key-main-header [data-testid="stImage"] img { max-width: 104px; }
+        .st-key-app-icon { width: 6.5rem; height: 6.5rem; }
         .brand-title { font-size: 2.5rem; }
         .brand-subtitle { font-size: 0.75rem; }
-        .st-key-urgent-hero { padding: 1rem; }
+        .st-key-urgent-hero-read,
+        .st-key-urgent-hero-unread { padding: 1rem; }
         .popup-header { grid-template-columns: 1fr; }
         .popup-header > div { border-right: 0; border-bottom: 1px solid var(--line); }
         .popup-header > div:last-child { border-bottom: 0; }
+        .message-fields { grid-template-columns: 1fr; }
     }
     @media (prefers-reduced-motion: reduce) {
         *, *::before, *::after { transition-duration: 0.01ms !important; }
@@ -414,8 +489,29 @@ if "human_review_decisions" not in st.session_state:
     st.session_state["human_review_decisions"] = {}
 if "read_message_ids" not in st.session_state:
     st.session_state["read_message_ids"] = set()
+if "queue_confirmed_ids" not in st.session_state:
+    st.session_state["queue_confirmed_ids"] = set()
+if "resolved_message_ids" not in st.session_state:
+    st.session_state["resolved_message_ids"] = set()
 
 FONT_SIZES = {"Regular": 16, "Large": 19, "Extra large": 22}
+
+
+def strip_reply_label(reply):
+    if not isinstance(reply, str):
+        return reply
+    for prefix in ("Automated assistant draft:", "自动助手回复草稿："):
+        if reply.startswith(prefix):
+            return reply[len(prefix):].lstrip()
+    return reply
+
+
+for saved_analysis in st.session_state["message_analyses"].values():
+    saved_reply = saved_analysis.get("reply")
+    if isinstance(saved_reply, dict):
+        saved_reply["suggested_reply"] = strip_reply_label(
+            saved_reply.get("suggested_reply")
+        )
 
 
 def is_valid_login(username, password):
@@ -433,11 +529,10 @@ if not st.session_state["is_authenticated"]:
                 '<p class="login-tagline">Silence the noise. Surface what matters.</p>'
                 '<p class="login-description">AI-powered message analysis that helps you '
                 'identify urgent communications and focus on what matters most.</p>'
-                '<h2 class="login-form-title">Welcome Back</h2>'
-                '<p class="login-form-subtitle">Sign in to review your messages.</p>',
+                '<h2 class="login-form-title">Welcome Back</h2>',
                 unsafe_allow_html=True,
             )
-            with st.form("login_form", enter_to_submit=False, border=False):
+            with st.form("login_form", enter_to_submit=True, border=False):
                 username = st.text_input("Username", key="login_username")
                 password = st.text_input(
                     "Password",
@@ -460,13 +555,11 @@ if not st.session_state["is_authenticated"]:
 
 with DATA_FILE.open("r", encoding="utf-8") as f:
     messages = json.load(f)
-queued_messages = get_queue(
-    messages,
-    st.session_state["message_analyses"],
-    st.session_state["human_review_decisions"],
-)
 
 st.session_state["read_message_ids"].intersection_update(
+    str(message["id"]) for message in messages
+)
+st.session_state["resolved_message_ids"].intersection_update(
     str(message["id"]) for message in messages
 )
 
@@ -474,6 +567,11 @@ st.markdown(
     f"<style>:root {{ --app-font-size: {FONT_SIZES[st.session_state['font_size']]}px; }}</style>",
     unsafe_allow_html=True,
 )
+
+
+@st.dialog("Urgent message", width="medium")
+def show_urgent_message(message, analysis):
+    show_message_details_content(message, analysis)
 
 
 @st.dialog("Message details", width="medium")
@@ -495,8 +593,7 @@ def show_message_details_content(message, analysis):
     sender = html.escape(str(message["sender"]))
     received_at = html.escape(str(message.get("received_at") or "Not provided"))
     full_message = html.escape(str(message["message"]))
-    urgency_value = "Not assessed"
-    urgency_style = "background-color:#6c757d"
+    urgency_badge = '<span class="urgency-badge" style="background-color:#6c757d">Not assessed</span>'
     category = "Awaiting analysis"
     extra_content = ""
 
@@ -504,17 +601,14 @@ def show_message_details_content(message, analysis):
         result = analysis["result"]
         reply = analysis["reply"]
         category = result["classification"]
-        urgency_value = f"{result['urgency_score']:.2f}"
-        urgency_style = f"background-color:{urgency_color(result)}"
+        urgency_badge = urgency_badge_html(result)
         extra_content = (
             '<p><strong>Demo confidence (not calibrated):</strong> '
             f'{result["confidence"]:.2f}</p>'
             f'<p class="popup-reason"><strong>Reason:</strong> '
             f'{html.escape(str(result["reason"]))}</p>'
         )
-        if result["source"] == "mock":
-            extra_content += '<p><strong>Status:</strong> Offline rule demo — no AI model was called.</p>'
-        elif result["source"] == "fallback":
+        if result["source"] == "fallback":
             extra_content += '<p><strong>Status:</strong> Analysis was unavailable or invalid. Human review is required.</p>'
         elif result["source"] == "guardrail":
             extra_content += '<p><strong>Status:</strong> A local safety check routed this message for human review.</p>'
@@ -530,15 +624,15 @@ def show_message_details_content(message, analysis):
     if category_key == "urgent":
         queue_footer = "Urgent: handle this tonight. It is not in the morning review queue."
     elif category_key == "wait_until_morning":
-        queue_footer = "This non-urgent message appears in morning review automatically. No reply has been sent."
+        queue_footer = "This non-urgent message appears in morning review automatically."
     elif category_key == "needs_human_review":
         decision = st.session_state["human_review_decisions"].get(message["id"])
         if decision is True:
-            queue_footer = "You chose morning review for this message. No reply has been sent."
+            queue_footer = "You chose morning review for this message."
         elif decision is False:
-            queue_footer = "You chose to handle this tonight. It appears in Tonight's attention, not morning review. No reply has been sent."
+            queue_footer = "You chose to handle this tonight. It appears in Tonight's attention, not morning review."
         else:
-            queue_footer = "Needs your decision before it can enter morning review. No reply has been sent."
+            queue_footer = "Needs your decision before it can enter morning review."
     else:
         queue_footer = "Analyze this message to decide whether it belongs in morning review."
     st.markdown(
@@ -546,7 +640,7 @@ def show_message_details_content(message, analysis):
         f'<div><strong>Case ID:</strong> {message_id}</div>'
         f'<div><strong>Category:</strong> {html.escape(str(category))}</div>'
         f'<div class="popup-urgency"><strong>Urgency level:</strong> '
-        f'<span class="urgency-badge" style="{urgency_style}">{urgency_value}</span></div>'
+        f'{urgency_badge}</div>'
         '</div>'
         '<div class="popup-body">'
         f'<p><strong>Sender: </strong>{sender}</p>'
@@ -569,12 +663,23 @@ def urgency_color(result):
     return "#{:02x}{:02x}{:02x}".format(*rgb)
 
 
+def urgency_badge_html(result):
+    score = f"{float(result['urgency_score']):.2f}"
+    color = urgency_color(result)
+    return (
+        f'<span class="urgency-badge" style="background-color:{color}">'
+        f'{score}</span>'
+    )
+
+
 def urgency_badge(result):
     if result is None:
         return "Awaiting analysis", "badge-pending"
     category = result.get("category")
     if category == "urgent":
         return "Urgent", "badge-urgent"
+    if category == "wait_until_morning":
+        return "Not urgent", "badge-low"
     if category == "spam":
         return "Spam", "badge-spam"
     if category == "needs_human_review":
@@ -587,8 +692,218 @@ def urgency_badge(result):
     return "Low", "badge-low"
 
 
+def resolve_human_review(message_id, review_in_morning):
+    st.session_state["human_review_decisions"][message_id] = review_in_morning
+    result = st.session_state["message_analyses"][message_id]["result"]
+    if review_in_morning:
+        result.update(
+            category="wait_until_morning",
+            classification="Non-Urgent",
+            action="queue_for_morning",
+            reason="You chose to review this message in the morning.",
+        )
+    else:
+        result.update(
+            category="urgent",
+            classification="Urgent",
+            action="notify_user_now",
+            urgency_score=max(float(result.get("urgency_score", 0.0)), 0.85),
+            reason="You chose to handle this message tonight.",
+        )
+
+
+def received_at_order(message):
+    received_at = message.get("received_at")
+    if not received_at:
+        return 1, datetime.max.replace(tzinfo=timezone.utc)
+    try:
+        parsed = datetime.fromisoformat(str(received_at).replace("Z", "+00:00"))
+    except ValueError:
+        return 1, datetime.max.replace(tzinfo=timezone.utc)
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return 0, parsed.astimezone(timezone.utc)
+
+
 def mark_message_as_read(message_id):
     st.session_state["read_message_ids"].add(str(message_id))
+
+
+def confirm_queue_message(message_id):
+    st.session_state["read_message_ids"].add(str(message_id))
+    st.session_state["queue_confirmed_ids"].add(str(message_id))
+
+
+def mark_message_as_replied(message_id):
+    message_id = str(message_id)
+    st.session_state["resolved_message_ids"].add(message_id)
+    st.session_state["read_message_ids"].add(message_id)
+    st.session_state["reply_notice"] = True
+
+
+def mark_message_as_manually_replied(message_id):
+    message_id = str(message_id)
+    st.session_state["resolved_message_ids"].add(message_id)
+    st.session_state["read_message_ids"].add(message_id)
+    st.session_state["manual_reply_notice"] = True
+
+
+def mark_queue_message_urgent(message_id):
+    result = st.session_state["message_analyses"][message_id]["result"]
+    result.update(
+        category="urgent",
+        classification="Urgent",
+        action="notify_user_now",
+        urgency_score=max(float(result.get("urgency_score", 0.0)), 0.85),
+        reason="You chose to handle this message urgently.",
+    )
+    st.session_state["human_review_decisions"][message_id] = False
+    st.session_state["queue_confirmed_ids"].discard(str(message_id))
+    st.session_state["read_message_ids"].add(str(message_id))
+    mark_message_as_replied(message_id)
+
+
+def render_message_card(message, section, *, queued=False, history=False):
+    message_id = str(message["id"])
+    analysis = st.session_state["message_analyses"].get(message["id"])
+    result = analysis["result"] if analysis else None
+    reply = analysis["reply"] if analysis else None
+    suggested_reply = reply["suggested_reply"] if reply else None
+    is_unread = message_id not in st.session_state["read_message_ids"]
+    card_state = "unread" if is_unread else "read"
+    category_label = result["classification"] if result else "Not analyzed"
+    urgency_html = (
+        urgency_badge_html(result)
+        if result
+        else '<span class="urgency-badge" style="background-color:#6c757d">'
+        'Not assessed</span>'
+    )
+    sender = html.escape(str(message["sender"]))
+    body = html.escape(str(message["message"]))
+    received_at = html.escape(str(message.get("received_at") or "Not provided"))
+    reply_text = (
+        html.escape(str(suggested_reply))
+        if suggested_reply
+        else "No safe reply draft is available."
+    )
+    from_label = "Silencer"
+
+    with st.container(
+        key=f"message-card-{card_state}-{section}-{message_id}",
+        border=True,
+    ):
+        if queued:
+            st.markdown(
+                '<div class="message-detail">'
+                f'<strong>Message ID:</strong> {html.escape(message_id)}</div>'
+                f'<div class="message-detail"><strong>Sender:</strong> {sender}</div>'
+                f'<div class="message-detail"><strong>Message:</strong> {body}</div>'
+                '<div class="message-detail"><strong>Suggested reply:</strong> '
+                f'{reply_text}</div>'
+                f'<div class="message-detail"><strong>From:</strong> {from_label}</div>',
+                unsafe_allow_html=True,
+            )
+        else:
+            st.markdown(
+                '<div class="message-fields">'
+                f'<div><strong>Message ID:</strong> {html.escape(message_id)}</div>'
+                f'<div><strong>Category:</strong> {html.escape(category_label)}</div>'
+                f'<div><strong>Urgency level:</strong> {urgency_html}</div>'
+                '</div>'
+                f'<div class="message-detail"><strong>Sender:</strong> {sender}</div>'
+                '<div class="message-detail"><strong>Received at:</strong> '
+                f'{html.escape(str(message.get("received_at") or "Not provided"))}</div>'
+                f'<div class="message-detail"><strong>Message:</strong> {body}</div>'
+                '<div class="message-detail"><strong>Suggested reply:</strong> '
+                f'{reply_text}</div>'
+                f'<div class="message-detail"><strong>From:</strong> {from_label}</div>',
+                unsafe_allow_html=True,
+            )
+
+        if queued:
+            if message_id in st.session_state["queue_confirmed_ids"]:
+                st.markdown(":material/check_circle: **Confirmed**")
+            else:
+                choice_columns = st.columns(2)
+                with choice_columns[0]:
+                    st.button(
+                        "Not urgent",
+                        key=f"queue-not-urgent-{message_id}",
+                        icon=":material/check_circle:",
+                        width="stretch",
+                        on_click=confirm_queue_message,
+                        args=(message_id,),
+                    )
+                with choice_columns[1]:
+                    st.button(
+                        "Urgent and send reply now",
+                        key=f"queue-send-now-{message_id}",
+                        icon=":material/priority_high:",
+                        width="stretch",
+                        on_click=mark_queue_message_urgent,
+                        args=(message_id,),
+                    )
+        elif history:
+            st.markdown(":material/check_circle: **Replied**")
+        else:
+            action_columns = st.columns(4)
+            with action_columns[0]:
+                if st.button(
+                    "View details",
+                    key=(
+                        "urgent-hero-details"
+                        if section == "priority"
+                        else f"{section}-details-{message_id}"
+                    ),
+                    icon=":material/visibility:",
+                    width="stretch",
+                    on_click=mark_message_as_read,
+                    args=(message_id,),
+                ):
+                    show_message_details(message, analysis)
+            with action_columns[1]:
+                manual_reply = section == "human-review"
+                st.button(
+                    "Manual reply" if manual_reply else "Send reply",
+                    key=f"{section}-send-{message_id}",
+                    icon=":material/check_circle:" if manual_reply else ":material/send:",
+                    width="stretch",
+                    disabled=not manual_reply and not suggested_reply,
+                    on_click=(
+                        mark_message_as_manually_replied
+                        if manual_reply
+                        else mark_message_as_replied
+                    ),
+                    args=(message_id,),
+                )
+            with action_columns[2]:
+                if st.button(
+                    "Copy reply",
+                    key=f"{section}-copy-{message_id}",
+                    icon=":material/content_copy:",
+                    width="stretch",
+                    disabled=not suggested_reply,
+                ):
+                    st.session_state["copy_reply_visible"] = message_id
+            with action_columns[3]:
+                if st.button(
+                    "Re-analyze",
+                    key=f"{section}-reanalyze-{message_id}",
+                    icon=":material/refresh:",
+                    width="stretch",
+                ):
+                    with st.spinner("Re-analyzing message..."):
+                        result = classify_message(message)
+                        st.session_state["message_analyses"][message["id"]] = {
+                            "result": result,
+                            "reply": generate_reply(message, result),
+                        }
+                        st.session_state["human_review_decisions"].pop(message["id"], None)
+                        st.session_state["queue_confirmed_ids"].discard(message_id)
+                    st.rerun()
+
+            if suggested_reply and st.session_state.get("copy_reply_visible") == message_id:
+                st.code(suggested_reply)
 
 
 analyses = st.session_state["message_analyses"]
@@ -608,20 +923,41 @@ if unanalyzed_messages:
                 "reply": generate_reply(message, result),
             }
 
-analyzed_count = sum(message["id"] in analyses for message in messages)
+queued_messages = get_queue(
+    messages,
+    analyses,
+    st.session_state["human_review_decisions"],
+)
+resolved_ids = st.session_state["resolved_message_ids"]
+active_messages = [
+    message for message in messages if str(message["id"]) not in resolved_ids
+]
+history_messages = [
+    message for message in messages if str(message["id"]) in resolved_ids
+]
+queued_messages = [
+    message for message in queued_messages
+    if str(message["id"]) not in resolved_ids
+]
+certain_count = sum(
+    message["id"] in analyses
+    and analyses[message["id"]]["result"].get("category") != "needs_human_review"
+    for message in active_messages
+)
 urgent_items = [
     (message, analyses[message["id"]]["result"])
-    for message in messages
+    for message in active_messages
     if message["id"] in analyses
     and analyses[message["id"]]["result"].get("category") == "urgent"
 ]
 urgent_count = len(urgent_items)
 with st.container(key="main-header"):
     logo_col, brand_col, settings_col, logout_col = st.columns(
-        [0.12, 0.52, 0.19, 0.17], vertical_alignment="center"
+        [0.16, 0.48, 0.19, 0.17], vertical_alignment="center"
     )
     with logo_col:
-        st.image(str(ICON_FILE), width=92)
+        with st.container(key="app-icon"):
+            st.image(ICON_FILE, width=96, alt="Silencer logo")
     with brand_col:
         st.markdown(
             '<div class="brand-title">Silencer</div>'
@@ -636,6 +972,8 @@ with st.container(key="main-header"):
             st.session_state["is_authenticated"] = False
             st.session_state["user_name"] = ""
             st.session_state["read_message_ids"] = set()
+            st.session_state["queue_confirmed_ids"] = set()
+            st.session_state["resolved_message_ids"] = set()
             st.rerun()
 
 if st.session_state["show_settings"]:
@@ -648,53 +986,47 @@ if st.session_state["show_settings"]:
             key="font_size",
             help="Choose Regular, Large, or Extra large text for the app.",
         )
-        st.write("API credentials are not displayed here. Replies are drafts only and are never sent.")
+        st.write("API credentials are not displayed here.")
 
 analyses = st.session_state["message_analyses"]
 review_decisions = st.session_state["human_review_decisions"]
-tonight_items = [
-    message
-    for message in messages
-    if message["id"] in analyses
-    and (
-        analyses[message["id"]]["result"].get("category") == "urgent"
-        or (
-            analyses[message["id"]]["result"].get("category") == "needs_human_review"
-            and review_decisions.get(message["id"]) is False
-        )
+if urgent_items:
+    urgent_message, urgent_result = min(
+        urgent_items, key=lambda item: received_at_order(item[0])
     )
-]
-if tonight_items:
-    tonight_items.sort(
-        key=lambda message: analyses[message["id"]]["result"].get("urgency_score", 0),
-        reverse=True,
+    urgent_id = str(urgent_message["id"])
+    urgent_sender = html.escape(str(urgent_message["sender"]))
+    urgent_body = html.escape(str(urgent_message["message"]))
+    priority_state = (
+        "unread" if urgent_id not in st.session_state["read_message_ids"] else "read"
     )
-    with st.container(key="tonight-summary"):
+    with st.container(key=f"urgent-hero-{priority_state}"):
         st.markdown(
-            f"<h3>Tonight's attention ({len(tonight_items)})</h3>",
+            '<div class="priority-title">Highest Priority Message</div>',
             unsafe_allow_html=True,
         )
-        for tonight_message in tonight_items:
-            result = analyses[tonight_message["id"]]["result"]
-            source = (
-                "Analysis: Urgent" if result.get("category") == "urgent"
-                else "Your decision: handle tonight"
-            )
-            if st.button(
-                f"{source} · {tonight_message['sender']}: {tonight_message['message']}",
-                key=f"tonight-message-{tonight_message['id']}",
-                use_container_width=True,
-            ):
-                show_message_details(tonight_message, analyses[tonight_message["id"]])
-        st.write(
-            "API credentials are not displayed here. Replies are drafts only; "
-            "nothing is sent or queued."
+        urgent_score = f"{float(urgent_result['urgency_score']):.2f}"
+        st.markdown(
+            '<div class="hero-urgency"><strong>Urgency level:</strong> '
+            f'<span class="urgency-badge" '
+            f'style="background-color:{urgency_color(urgent_result)}">'
+            f'{urgent_score}</span></div>',
+            unsafe_allow_html=True,
         )
+        if st.button(
+            f"**Sender:** {urgent_sender}\n\n**Message:** {urgent_body}",
+            key="urgent-hero-open",
+            type="tertiary",
+            width="stretch",
+            on_click=mark_message_as_read,
+            args=(urgent_id,),
+        ):
+            show_urgent_message(urgent_message, analyses[urgent_message["id"]])
 
 name = html.escape(st.session_state["user_name"].strip().title() or "there")
 unread_count = sum(
     str(message["id"]) not in st.session_state["read_message_ids"]
-    for message in messages
+    for message in active_messages
 )
 urgent_summary = (
     f"{urgent_count} message requires immediate attention."
@@ -705,16 +1037,16 @@ urgent_summary = (
 )
 st.markdown(
     f'<h1 class="greeting-title">Welcome back, {name} 👋</h1>'
-    f'<p class="greeting-copy">You have {len(messages)} messages today, '
+    f'<p class="greeting-copy">You have {len(active_messages)} messages today, '
     f'{unread_count} unread. '
     f'{urgent_summary}</p>',
     unsafe_allow_html=True,
 )
 
 kpi_data = [
-    ("Messages received", str(len(messages)), "In your inbox"),
+    ("Messages received", str(len(active_messages)), "In your inbox"),
     ("Urgent messages", str(urgent_count), "Immediate attention"),
-    ("Analyzed", f"{analyzed_count}/{len(messages)}", "Messages reviewed"),
+    ("Analyzed", f"{certain_count}/{len(active_messages)}", "Messages reviewed"),
 ]
 kpi_columns = st.columns(3, gap="medium")
 for column, (label, value, note) in zip(kpi_columns, kpi_data):
@@ -727,53 +1059,6 @@ for column, (label, value, note) in zip(kpi_columns, kpi_data):
             '</div>',
             unsafe_allow_html=True,
         )
-
-if urgent_items:
-    urgent_message, urgent_result = max(
-        urgent_items, key=lambda item: item[1].get("urgency_score", 0)
-    )
-    urgent_analysis = analyses[urgent_message["id"]]
-    urgent_reply = urgent_analysis["reply"]
-    badge_label, badge_class = urgency_badge(urgent_result)
-    with st.container(key="urgent-hero"):
-        st.markdown(
-            '<div class="hero-eyebrow">Action needed '
-            f'<span class="category-badge {badge_class}">{html.escape(badge_label)}</span>'
-            '</div>'
-            f'<div class="hero-sender">From {html.escape(str(urgent_message["sender"]))}</div>'
-            f'<p class="hero-message">{html.escape(str(urgent_message["message"]))}</p>'
-            f'<div class="hero-score">Urgency score · '
-            f'{urgent_result["urgency_score"]:.2f}</div>',
-            unsafe_allow_html=True,
-        )
-        suggested_reply = urgent_reply["suggested_reply"]
-        if suggested_reply:
-            st.markdown(
-                '<div class="reply-preview"><strong>Suggested reply</strong><br>'
-                f'{html.escape(str(suggested_reply))}</div>',
-                unsafe_allow_html=True,
-            )
-        else:
-            st.markdown(
-                '<div class="reply-preview"><strong>Suggested reply</strong><br>'
-                'No safe reply draft is available; please handle this message manually.'
-                '</div>',
-                unsafe_allow_html=True,
-            )
-        with st.container():
-            if st.button(
-                "View details",
-                key="urgent-hero-details",
-                icon=":material/visibility:",
-                width="stretch",
-                on_click=mark_message_as_read,
-                args=(urgent_message["id"],),
-            ):
-                show_urgent_message(urgent_message, urgent_result, urgent_reply)
-else:
-    with st.container(border=True):
-        st.markdown("### ✅ You’re all caught up")
-        st.write("No messages currently need immediate attention.")
 
 with st.container(key="search-strip"):
     search_col, filter_col = st.columns([0.68, 0.32], gap="medium", vertical_alignment="center")
@@ -793,87 +1078,46 @@ with st.container(key="search-strip"):
             key="message_filter",
         )
 
-analyzed_count = sum(message["id"] in analyses for message in messages)
-unanalyzed_messages = [
-    message for message in messages if message["id"] not in analyses
-]
-with st.container(key="message-count-grid"):
-    counter_col, batch_col = st.columns(
-        [2.3, 1], gap="large", vertical_alignment="center"
-    )
-    with counter_col:
-        st.markdown(
-            '<div class="message-count-table">'
-            '<div class="message-count-label">Messages received</div>'
-            '<div class="message-count-label">Analyzed</div>'
-            '<div class="message-count-label">Not analyzed</div>'
-            f'<div>{len(messages)}</div>'
-            f'<div>{analyzed_count}</div>'
-            f'<div>{len(unanalyzed_messages)}</div>'
-            '</div>',
-            unsafe_allow_html=True,
-        )
-    with batch_col:
-        if st.button(
-            "Analyze all messages",
-            key="analyze-all-messages",
-            disabled=not unanalyzed_messages,
-        ):
-            with st.spinner(f"Analyzing {len(unanalyzed_messages)} messages..."):
-                for message in unanalyzed_messages:
-                    result = classify_message(message)
-                    reply = generate_reply(message, result)
-                    analyses[message["id"]] = {"result": result, "reply": reply}
-                    st.session_state["human_review_decisions"].pop(message["id"], None)
-            st.rerun()
-if os.environ.get("SILENCER_MODE", "mock") == "llm" and unanalyzed_messages:
-    st.caption(
-        "Analyze all makes one model request per unanalyzed message and may incur API charges."
-    )
-
 review_items = [
-    message for message in messages
+    message for message in active_messages
     if message["id"] in analyses
     and analyses[message["id"]]["result"].get("category") == "needs_human_review"
 ]
-if review_items:
-    st.subheader(f"Needs human review ({len(review_items)})")
-    st.caption("Choose whether each message can wait until morning. No reply is sent.")
+with st.expander(f"Needs human review ({len(review_items)})", expanded=True):
+    st.caption("Review uncertain messages and decide whether they can wait until morning.")
     for review_message in review_items:
         review_id = review_message["id"]
         decision = st.session_state["human_review_decisions"].get(review_id)
-        with st.container(border=True):
-            st.write(f"{review_message['sender']}: {review_message['message']}")
-            st.caption(analyses[review_id]["result"]["reason"])
-            if decision is True:
-                st.success("Your choice: review in the morning")
-            elif decision is False:
-                st.warning("Your choice: handle tonight")
-            morning_col, tonight_col = st.columns(2)
-            with morning_col:
-                if st.button("Yes, review in morning", key=f"review-morning-{review_id}"):
-                    st.session_state["human_review_decisions"][review_id] = True
-                    st.rerun()
-            with tonight_col:
-                if st.button("No, handle tonight", key=f"review-tonight-{review_id}"):
-                    st.session_state["human_review_decisions"][review_id] = False
-                    st.rerun()
+        render_message_card(review_message, "human-review")
+        st.caption(analyses[review_id]["result"]["reason"])
+        if decision is True:
+            st.success("Your choice: review in the morning")
+        elif decision is False:
+            st.warning("Your choice: handle tonight")
+        morning_col, tonight_col = st.columns(2)
+        with morning_col:
+            if st.button("Yes, review in morning", key=f"review-morning-{review_id}"):
+                resolve_human_review(review_id, review_in_morning=True)
+                st.rerun()
+        with tonight_col:
+            if st.button("No, handle tonight", key=f"review-tonight-{review_id}"):
+                resolve_human_review(review_id, review_in_morning=False)
+                st.rerun()
 
-st.subheader(f"Morning review queue ({len(queued_messages)})")
-st.caption("Non-urgent messages appear automatically; human-review messages appear only if you choose morning. No replies are sent.")
-if not queued_messages:
-    st.info("No messages in morning review yet. Analyze messages to build the list.")
-else:
-    for queued_message in queued_messages:
-        with st.container(border=True):
-            st.markdown(f"**{html.escape(queued_message['sender'])}**")
-            st.write(queued_message["message"])
-            st.caption(f"Category: {queued_message['classification']}")
-            if queued_message["category"] == "needs_human_review":
-                st.caption("Added after your decision; AI classification remains Needs Human Review.")
-            st.caption(
-                f"Received: {queued_message.get('received_at') or 'Not provided'}"
-            )
+with st.expander(f"Morning review queue ({len(queued_messages)})", expanded=True):
+    st.caption(
+        "Non-urgent messages appear automatically. Human-review messages appear "
+        "only when you choose morning review."
+    )
+    if not queued_messages:
+        st.info("No messages in morning review yet. Analyze messages to build the list.")
+    else:
+        for queued_message in queued_messages:
+            render_message_card(queued_message, "morning-queue", queued=True)
+if st.session_state.pop("reply_notice", False):
+    st.success("The message was marked as replied and moved to History.")
+if st.session_state.pop("manual_reply_notice", False):
+    st.success("The message was marked as replied and moved to History.")
 
 filter_categories = {
     "Urgent": "urgent",
@@ -881,7 +1125,7 @@ filter_categories = {
     "Needs Human Review": "needs_human_review",
 }
 visible_messages = []
-for message in messages:
+for message in active_messages:
     analysis = analyses.get(message["id"])
     haystack = f"{message['sender']} {message['message']}".casefold()
     if search_text and search_text.casefold() not in haystack:
@@ -893,87 +1137,16 @@ for message in messages:
             continue
     visible_messages.append(message)
 
-st.markdown('<div class="section-title">Your messages</div>', unsafe_allow_html=True)
-if not visible_messages:
-    st.info("No messages match the current search and filter.")
+with st.expander(f"Messages List ({len(visible_messages)})", expanded=True):
+    st.caption("All messages are displayed here for your review.")
+    if not visible_messages:
+        st.info("No messages match the current search and filter.")
+    for message in visible_messages:
+        render_message_card(message, "inbox")
 
-for message in visible_messages:
-    analysis = analyses.get(message["id"])
-    result = analysis["result"] if analysis else None
-    reply = analysis["reply"] if analysis else None
-    message_id = str(message["id"])
-    is_unread = message_id not in st.session_state["read_message_ids"]
-    badge_label, badge_class = urgency_badge(result)
-    suggested_reply = reply["suggested_reply"] if reply else None
-    received_at = message.get("received_at") or "Time not provided"
-    urgency_value = f'{result["urgency_score"]:.2f}' if result else "Not assessed"
-    card_state = "unread" if is_unread else "read"
-    with st.container(key=f"message-card-{card_state}-{message_id}", border=True):
-        unread_marker = (
-            '<span class="unread-indicator"><span class="unread-dot"></span>'
-            'Unread</span>'
-            if is_unread
-            else ""
-        )
-        st.markdown(
-            '<div class="message-topline">'
-            f'<span class="category-badge {badge_class}">{html.escape(badge_label)}</span>'
-            f'<span class="message-meta">Case {html.escape(message_id)}</span>'
-            f'{unread_marker}</div>'
-            f'<div class="message-sender">{html.escape(str(message["sender"]))}</div>'
-            f'<div class="message-time">Received · {html.escape(str(received_at))}</div>'
-            f'<p class="message-body">{html.escape(str(message["message"]))}</p>',
-            unsafe_allow_html=True,
-        )
-        action_col, details_col = st.columns([0.78, 0.22])
-        with action_col:
-            action_label = "Re-analyze message" if analysis else "Analyze message"
-            if st.button(action_label, key=f"analyze-{message_id}"):
-                result = classify_message(message)
-                reply = generate_reply(message, result)
-                analyses[message["id"]] = {"result": result, "reply": reply}
-                st.session_state["human_review_decisions"].pop(message["id"], None)
-                st.rerun()
-        if suggested_reply:
-            st.markdown(
-                '<div class="reply-preview"><strong>Suggested reply</strong><br>'
-                f'{html.escape(str(suggested_reply))}</div>',
-                unsafe_allow_html=True,
-            )
-        elif reply:
-            st.markdown(
-                '<div class="reply-preview"><strong>Suggested reply</strong><br>'
-                'No safe reply draft is available; please handle this message manually.'
-                '</div>',
-                unsafe_allow_html=True,
-            )
-        st.markdown(
-            f'<div class="message-meta">Urgency score · {html.escape(urgency_value)}</div>',
-            unsafe_allow_html=True,
-        )
-        details_col, copy_col, _ = st.columns([0.2, 0.2, 0.6])
-        with details_col:
-            if st.button(
-                "View details",
-                key=f"view-details-{message_id}",
-                icon=":material/visibility:",
-                width="stretch",
-                on_click=mark_message_as_read,
-                args=(message_id,),
-            ):
-                show_message_details(message, analysis)
-        with copy_col:
-            if st.button(
-                "Copy reply",
-                key=f"copy-reply-{message_id}",
-                icon=":material/content_copy:",
-                disabled=not suggested_reply,
-                width="stretch",
-            ):
-                st.session_state["copy_reply_visible"] = message_id
-        if (
-            suggested_reply
-            and st.session_state.get("copy_reply_visible") == message_id
-        ):
-            st.caption("Use the copy control on the draft below to copy it.")
-            st.code(suggested_reply)
+with st.expander(f"History ({len(history_messages)})", expanded=False):
+    st.caption("Review past messages here.")
+    if not history_messages:
+        st.info("No resolved messages yet.")
+    for message in history_messages:
+        render_message_card(message, "history", history=True)
