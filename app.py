@@ -70,21 +70,6 @@ st.markdown(
     .message-count-label {
         border-bottom: 1px solid #555;
     }
-    .st-key-analyze-all-messages [data-testid="stButton"] {
-        display: flex;
-        justify-content: flex-end;
-        padding-left: 1.5rem;
-    }
-    .st-key-analyze-all-messages button {
-        min-height: 5.75rem;
-        border: 1px solid #555;
-        border-radius: 18px;
-        white-space: normal;
-        width: 100%;
-        max-width: none;
-        font-size: 1.15rem !important;
-        font-weight: 600;
-    }
     [data-testid="stImage"] img {
         object-fit: contain;
     }
@@ -103,16 +88,17 @@ st.markdown(
         }
     }
     [class*="st-key-urgent-summary"] {
-        border: 2px solid #303030;
+        border: 2px solid #dc3545;
         border-radius: 24px;
         padding: 1.3rem 1.5rem;
         margin: 1.5rem 0 1rem;
         text-align: center;
+        background: #fff5f5;
         animation: urgent-summary-appear 500ms ease-out both;
     }
     [class*="st-key-urgent-summary"] h3 {
         margin: 0 0 0.4rem;
-        color: #146b37;
+        color: #b02a37;
     }
     @media (prefers-reduced-motion: reduce) {
         [class*="st-key-urgent-summary"] {
@@ -122,16 +108,17 @@ st.markdown(
     .st-key-urgent-message-button button {
         width: 100%;
         min-height: 3rem;
-        border: 0;
-        background: transparent;
-        color: inherit;
+        border: 1px solid #dc3545;
+        border-radius: 12px;
+        background: #fff;
+        color: #212529;
         white-space: normal;
         overflow-wrap: anywhere;
     }
     .st-key-urgent-message-button button:hover {
-        border: 0;
-        color: #146b37;
-        background: #f7f7f7;
+        border-color: #b02a37;
+        color: #212529;
+        background: #ffe3e6;
     }
     [class*="st-key-message-card-"] {
         border: 1px solid #555;
@@ -164,6 +151,17 @@ st.markdown(
     }
     .message-card-header > div:last-child {
         border-right: 0;
+    }
+    .message-card-body {
+        display: flex;
+        flex-direction: column;
+        gap: 0.85rem;
+        padding: 0.5rem 0.25rem 0.25rem;
+    }
+    .message-card-body > p {
+        margin: 0;
+        line-height: 1.5;
+        overflow-wrap: anywhere;
     }
     .message-urgency {
         flex-direction: row;
@@ -212,8 +210,8 @@ st.markdown(
     .popup-body {
         display: flex;
         flex-direction: column;
-        gap: 0.85rem;
-        padding: 0.25rem 0.25rem 0.5rem;
+        gap: 1rem;
+        padding: 0.75rem 0.5rem 0.75rem;
         overflow-wrap: anywhere;
     }
     .popup-body p {
@@ -235,7 +233,14 @@ st.markdown(
         overflow: hidden;
         overflow-wrap: anywhere;
         min-height: 3rem;
-        margin: 0.5rem 0;
+        line-height: 1.5;
+    }
+    .message-card-reply {
+        margin: 0;
+        padding-top: 0.75rem;
+        border-top: 1px solid #e5e5e5;
+        overflow-wrap: anywhere;
+        white-space: pre-wrap;
     }
     .urgency-badge {
         display: inline-block;
@@ -286,7 +291,7 @@ if not st.session_state["is_authenticated"]:
     st.title("Silencer")
     st.subheader("Log in")
     st.caption("Sign in to review your messages.")
-    with st.form("login_form"):
+    with st.form("login_form", enter_to_submit=False):
         username = st.text_input("Username", key="login_username")
         password = st.text_input("Password", type="password", key="login_password")
         submitted = st.form_submit_button("Log in")
@@ -391,6 +396,23 @@ def urgency_color(result):
     return "#{:02x}{:02x}{:02x}".format(*rgb)
 
 
+analyses = st.session_state["message_analyses"]
+unanalyzed_messages = [
+    message for message in messages if message["id"] not in analyses
+]
+if unanalyzed_messages:
+    if os.environ.get("SILENCER_MODE", "mock") == "llm":
+        st.caption(
+            "Messages are analyzed automatically. This makes one model request "
+            "per message and may incur API charges."
+        )
+    with st.spinner(f"Analyzing {len(unanalyzed_messages)} messages..."):
+        for message in unanalyzed_messages:
+            result = classify_message(message)
+            reply = generate_reply(message, result)
+            analyses[message["id"]] = {"result": result, "reply": reply}
+
+
 icon_col, name_col, settings_col = st.columns(
     [0.16, 0.70, 0.14], vertical_alignment="center"
 )
@@ -417,7 +439,6 @@ if st.session_state["show_settings"]:
         )
         st.write("API credentials are not displayed here. Replies are drafts only; nothing is sent or queued.")
 
-analyses = st.session_state["message_analyses"]
 urgent_items = [
     (message, analyses[message["id"]]["result"])
     for message in messages
@@ -460,36 +481,16 @@ unanalyzed_messages = [
     message for message in messages if message["id"] not in analyses
 ]
 with st.container(key="message-count-grid"):
-    counter_col, batch_col = st.columns(
-        [2.3, 1], gap="large", vertical_alignment="center"
-    )
-    with counter_col:
-        st.markdown(
-            '<div class="message-count-table">'
-            '<div class="message-count-label">Messages received</div>'
-            '<div class="message-count-label">Analyzed</div>'
-            '<div class="message-count-label">Not analyzed</div>'
-            f'<div>{len(messages)}</div>'
-            f'<div>{analyzed_count}</div>'
-            f'<div>{len(unanalyzed_messages)}</div>'
-            '</div>',
-            unsafe_allow_html=True,
-        )
-    with batch_col:
-        if st.button(
-            "Analyze all messages",
-            key="analyze-all-messages",
-            disabled=not unanalyzed_messages,
-        ):
-            with st.spinner(f"Analyzing {len(unanalyzed_messages)} messages..."):
-                for message in unanalyzed_messages:
-                    result = classify_message(message)
-                    reply = generate_reply(message, result)
-                    analyses[message["id"]] = {"result": result, "reply": reply}
-            st.rerun()
-if os.environ.get("SILENCER_MODE", "mock") == "llm" and unanalyzed_messages:
-    st.caption(
-        "Analyze all makes one model request per unanalyzed message and may incur API charges."
+    st.markdown(
+        '<div class="message-count-table">'
+        '<div class="message-count-label">Messages received</div>'
+        '<div class="message-count-label">Analyzed</div>'
+        '<div class="message-count-label">Not analyzed</div>'
+        f'<div>{len(messages)}</div>'
+        f'<div>{analyzed_count}</div>'
+        f'<div>{len(unanalyzed_messages)}</div>'
+        '</div>',
+        unsafe_allow_html=True,
     )
 
 filter_categories = {
@@ -514,17 +515,18 @@ if not visible_messages:
     st.info("No messages match the current search and filter.")
 
 for message in visible_messages:
-    analysis = analyses.get(message["id"])
+    analysis = analyses[message["id"]]
     message_id = html.escape(str(message["id"]))
-    category = analysis["result"]["classification"] if analysis else "Awaiting analysis"
-    urgency = analysis["result"]["urgency_score"] if analysis else None
+    category = analysis["result"]["classification"]
+    urgency = analysis["result"]["urgency_score"]
     received_at = message.get("received_at") or "Not provided"
-    if analysis:
-        color = urgency_color(analysis["result"])
-        urgency_label = f"{urgency:.2f}"
-    else:
-        color = "#6c757d"
-        urgency_label = "Not assessed"
+    color = urgency_color(analysis["result"])
+    urgency_label = f"{urgency:.2f}"
+    suggested_reply = analysis["reply"]["suggested_reply"]
+    if suggested_reply is None:
+        suggested_reply = (
+            "No safe reply draft is available; please handle this message manually."
+        )
 
     with st.container(key=f"message-card-{message_id}"):
         st.markdown(
@@ -535,20 +537,21 @@ for message in visible_messages:
             f'<span class="urgency-badge" style="background-color:{color}">'
             f'{urgency_label}</span></div>'
             '</div>'
+            '<div class="message-card-body">'
             f'<p><strong>Sender:</strong> {html.escape(str(message["sender"]))}</p>'
             f'<p><strong>Received at:</strong> {html.escape(str(received_at))}</p>'
             f'<div class="message-card-message"><strong>Message:</strong> '
-            f'{html.escape(str(message["message"]))}</div>',
+            f'{html.escape(str(message["message"]))}</div>'
+            f'<p class="message-card-reply"><strong>Suggested reply:</strong> '
+            f'{html.escape(str(suggested_reply))}</p>'
+            '</div>',
             unsafe_allow_html=True,
         )
-        action_col, details_col = st.columns([0.78, 0.22])
-        with action_col:
-            action_label = "Re-analyze message" if analysis else "Analyze message"
-            if st.button(action_label, key=f"analyze-{message_id}"):
-                result = classify_message(message)
-                reply = generate_reply(message, result)
-                analyses[message["id"]] = {"result": result, "reply": reply}
-                st.rerun()
+        _, details_col = st.columns([0.8, 0.2])
         with details_col:
-            if st.button("View details", key=f"view-details-{message_id}"):
+            if st.button(
+                "View details",
+                key=f"view-details-{message_id}",
+                use_container_width=True,
+            ):
                 show_message_details(message, analysis)

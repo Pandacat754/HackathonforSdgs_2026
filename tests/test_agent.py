@@ -170,12 +170,17 @@ class AgentTests(unittest.TestCase):
         project = ROOT
         rendered = []
         errors = []
+        form_options = {}
         st = ModuleType("streamlit")
         st.set_page_config = lambda *args, **kwargs: None
         st.markdown = lambda value, **kwargs: rendered.append(value)
         st.title = st.subheader = st.caption = st.info = lambda *args, **kwargs: None
         st.error = lambda message: errors.append(message)
-        st.form = lambda *args, **kwargs: nullcontext()
+        def record_form(*args, **kwargs):
+            form_options.update(kwargs)
+            return nullcontext()
+
+        st.form = record_form
         st.text_input = lambda label, **kwargs: {
             "login_username": "test",
             "login_password": "wrong",
@@ -194,6 +199,7 @@ class AgentTests(unittest.TestCase):
 
         self.assertFalse(st.session_state["is_authenticated"])
         self.assertIn("Incorrect username or password.", errors)
+        self.assertFalse(form_options["enter_to_submit"])
         self.assertFalse(any('<div class="message-count-table">' in str(value) for value in rendered))
 
     def test_a_original_app_call_flow(self):
@@ -203,6 +209,7 @@ class AgentTests(unittest.TestCase):
         if not (project / "app.py").exists():
             self.skipTest("A's original download is not alongside this delivery")
         rendered = []
+        button_labels = []
         st = ModuleType("streamlit")
         st.set_page_config = st.image = lambda *args, **kwargs: None
         st.markdown = lambda value, **kwargs: rendered.append(value)
@@ -212,10 +219,12 @@ class AgentTests(unittest.TestCase):
         st.info = st.warning = st.error = lambda *args: None
         st.caption = st.metric = lambda *args, **kwargs: None
         st.spinner = lambda *args, **kwargs: nullcontext()
-        st.button = lambda label, *args, **kwargs: label in {
-            "Analyze message",
-            "Analyze all messages",
-        }
+
+        def record_button(label, *args, **kwargs):
+            button_labels.append(label)
+            return False
+
+        st.button = record_button
         st.columns = lambda specs, **kwargs: [
             nullcontext() for _ in range(specs if isinstance(specs, int) else len(specs))
         ]
@@ -240,6 +249,12 @@ class AgentTests(unittest.TestCase):
         self.assertTrue(any("Non-Urgent" in str(value) for value in rendered))
         self.assertTrue(any("message-card-header" in str(value) for value in rendered))
         self.assertTrue(any("urgency-badge" in str(value) for value in rendered))
+        self.assertTrue(any("Sender:</strong>" in str(value) for value in rendered))
+        self.assertTrue(any("Received at:</strong>" in str(value) for value in rendered))
+        self.assertTrue(any("Suggested reply:</strong>" in str(value) for value in rendered))
+        self.assertNotIn("Analyze message", button_labels)
+        self.assertNotIn("Analyze all messages", button_labels)
+        self.assertIn("View details", button_labels)
         self.assertEqual(len(st.session_state["message_analyses"]), 4)
         self.assertIn("Automated assistant draft", str(st.session_state["message_analyses"]["msg001"]["reply"]["suggested_reply"]))
 
