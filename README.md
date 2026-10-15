@@ -20,22 +20,12 @@ Silencer aims to:
 
 ## Demo Workflow
 
-```
-Incoming Work Message
-         ↓
- AI Urgency Assessment
-         ↓
-      Urgent?
-      /     \
-    Yes      No
-     ↓        ↓
- Notify     Generate
-  User      Reply
-              ↓
-        Add to Queue
-              ↓
-      Morning Review
-```
+1. Analyze a sample message to show its urgency category, reason, and suggested reply draft.
+2. Add Non-Urgent messages to the morning review queue automatically.
+3. Keep Urgent messages in Tonight's attention.
+4. For Needs Human Review messages, let the user choose morning review or tonight's attention.
+
+The demo does not send replies or notifications.
 
 ## Project Structure
 
@@ -113,22 +103,18 @@ Expected Output:
 Location:
 
 ```python
-queue/morning_queue.py
+morning_queue.py
 ```
 
 Functions:
 
 ```python
-add_to_queue(message)
-
-get_queue()
+get_queue(messages, analyses, review_decisions)
 ```
 
 Purpose:
 
-- Store non-urgent messages
-- Display deferred messages the next morning
-- Support morning review workflow
+The morning review queue automatically includes analyzed Non-Urgent messages. Needs Human Review messages are added only when the user chooses morning review; Urgent messages remain in Tonight's attention.
 
 
 ## Running the Project
