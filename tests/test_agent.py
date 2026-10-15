@@ -226,6 +226,7 @@ class AgentTests(unittest.TestCase):
         if not (project / "app.py").exists():
             self.skipTest("A's original download is not alongside this delivery")
         rendered = []
+        button_labels = []
         st = ModuleType("streamlit")
         st.set_page_config = st.image = lambda *args, **kwargs: None
         st.markdown = lambda value, **kwargs: rendered.append(value)
