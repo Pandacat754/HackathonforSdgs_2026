@@ -13,6 +13,9 @@ from morning_queue import get_queue
 
 APP_DIR = Path(__file__).resolve().parent
 DATA_FILE = APP_DIR / "data" / "sample_messages.json"
+RELATIONSHIP_MAP_FILE = APP_DIR / "data" / "relationship_map.json"
+CATEGORY_DISPLAY_FILE = APP_DIR / "data" / "category_display.json"
+REPLY_FEEDBACK_FILE = APP_DIR / "data" / "reply_feedback.json"
 ICON_FILE = APP_DIR / "assets" / "icon.png"
 
 st.set_page_config(page_title="Silencer", page_icon=str(ICON_FILE), layout="wide")
@@ -430,6 +433,11 @@ st.markdown(
     }
     .popup-header > div:last-child { border-right: 0; }
     .popup-header strong { margin-right: 0.35rem; }
+    .popup-category-review {
+        flex-direction: column;
+        gap: 0.25rem;
+    }
+    .popup-category-review strong { margin-right: 0; }
     .popup-body {
         display: flex;
         flex-direction: column;
@@ -449,6 +457,133 @@ st.markdown(
         font-weight: 700;
         text-align: center;
         white-space: nowrap;
+    }
+    .feedback-actions {
+        display: flex;
+        gap: 0.4rem;
+        margin-top: 0.5rem;
+    }
+    .st-key-feedback-up-msg001 [data-testid="stButton"] button,
+    [class*="st-key-feedback-up-"] [data-testid="stButton"] button,
+    [class*="st-key-feedback-down-"] [data-testid="stButton"] button {
+        width: 2.7rem;
+        min-width: 2.7rem;
+        max-width: 2.7rem;
+        height: 2.7rem;
+        min-height: 2.7rem;
+        max-height: 2.7rem;
+        padding: 0.25rem;
+        border-radius: 50%;
+        background: #f1f5f9;
+        border-color: #cbd5e1;
+        color: #64748b;
+        box-shadow: none;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    [class*="st-key-feedback-up-"] [data-testid="stButton"] button > div,
+    [class*="st-key-feedback-down-"] [data-testid="stButton"] button > div {
+        display: flex !important;
+        position: relative;
+        width: 100%;
+        height: 100%;
+        align-items: center !important;
+        justify-content: center !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+    [class*="st-key-feedback-up-"] [data-testid="stIconMaterial"],
+    [class*="st-key-feedback-down-"] [data-testid="stIconMaterial"] {
+        flex: 0 0 auto;
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        margin: 0 !important;
+        font-size: 1.25rem !important;
+        line-height: 1;
+        transform: translate(-50%, -50%);
+    }
+    .st-key-layout_toggle_button [data-testid="stButton"] button {
+        min-width: 3.25rem;
+        min-height: 3rem;
+        padding: 0.25rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .st-key-layout_toggle_button [data-testid="stIconMaterial"] {
+        margin: 0 !important;
+        font-size: 1.75rem !important;
+    }
+    [class*="st-key-feedback-up-"] button[kind="primary"] {
+        background: #16a34a !important;
+        border-color: #16a34a !important;
+        color: #fff !important;
+    }
+    [class*="st-key-feedback-down-"] button[kind="primary"] {
+        background: #dc2626 !important;
+        border-color: #dc2626 !important;
+        color: #fff !important;
+    }
+    .stApp:has(.st-key-mobile-layout) .stMainBlockContainer {
+        max-width: 100%;
+        padding: 0.65rem 0.7rem 1.5rem;
+    }
+    .stApp:has(.st-key-mobile-layout) .st-key-main-header {
+        padding: 0.25rem 0;
+        margin-bottom: 0.6rem;
+    }
+    .stApp:has(.st-key-mobile-layout) .st-key-main-header [data-testid="stHorizontalBlock"] {
+        flex-wrap: nowrap !important;
+        gap: 0.2rem !important;
+    }
+    .stApp:has(.st-key-mobile-layout) .st-key-app-icon {
+        width: 2.8rem;
+        height: 2.8rem;
+    }
+    .stApp:has(.st-key-mobile-layout) .st-key-app-icon [data-testid="stImage"] img {
+        width: 44px;
+        height: 44px;
+    }
+    .stApp:has(.st-key-mobile-layout) .brand-title { font-size: 1.35rem; }
+    .stApp:has(.st-key-mobile-layout) .brand-subtitle { font-size: 0.62rem; }
+    .stApp:has(.st-key-mobile-layout) .st-key-main-header [data-testid="stButton"] button {
+        min-width: 2rem;
+        padding: 0.25rem;
+        font-size: 0.72rem;
+        white-space: nowrap;
+    }
+    .stApp:has(.st-key-mobile-layout) .st-key-layout_toggle_button [data-testid="stButton"] button {
+        min-width: 2.75rem;
+        min-height: 2.75rem;
+    }
+    .stApp:has(.st-key-mobile-layout) .st-key-layout_toggle_button [data-testid="stIconMaterial"] {
+        font-size: 1.5rem !important;
+    }
+    .stApp:has(.st-key-mobile-layout) [data-testid="stHorizontalBlock"] {
+        gap: 0.55rem;
+    }
+    .stApp:has(.st-key-mobile-layout) .st-key-search-strip [data-testid="stHorizontalBlock"] {
+        flex-wrap: wrap;
+    }
+    .stApp:has(.st-key-mobile-layout) .st-key-search-strip [data-testid="stColumn"] {
+        flex: 1 1 100% !important;
+        min-width: 0;
+    }
+    .stApp:has(.st-key-mobile-layout) .kpi-card {
+        padding: 0.8rem;
+    }
+    .stApp:has(.st-key-mobile-layout) .kpi-label,
+    .stApp:has(.st-key-mobile-layout) .kpi-value {
+        font-size: 1.25rem;
+        min-height: 0;
+    }
+    .stApp:has(.st-key-mobile-layout) .greeting-title { font-size: 1.45rem; }
+    .stApp:has(.st-key-mobile-layout) .st-key-urgent-hero-read,
+    .stApp:has(.st-key-mobile-layout) .st-key-urgent-hero-unread {
+        padding: 0.8rem;
+        margin: 0.8rem 0;
     }
     @media (max-width: 900px) {
         .stMainBlockContainer { padding: 1rem 1.1rem 2rem; }
@@ -485,6 +620,12 @@ if "show_settings" not in st.session_state:
     st.session_state["show_settings"] = False
 if "font_size" not in st.session_state:
     st.session_state["font_size"] = "Regular"
+if "show_relationship_map" not in st.session_state:
+    st.session_state["show_relationship_map"] = False
+if "layout_mode" not in st.session_state:
+    st.session_state["layout_mode"] = "desktop"
+if "settings_notice" not in st.session_state:
+    st.session_state["settings_notice"] = ""
 if "human_review_decisions" not in st.session_state:
     st.session_state["human_review_decisions"] = {}
 if "read_message_ids" not in st.session_state:
@@ -495,6 +636,27 @@ if "resolved_message_ids" not in st.session_state:
     st.session_state["resolved_message_ids"] = set()
 
 FONT_SIZES = {"Regular": 16, "Large": 19, "Extra large": 22}
+MOBILE_FONT_SIZES = {"Regular": 14, "Large": 16, "Extra large": 18}
+RELATIONSHIPS = (
+    "Family", "Friend", "Lecturer", "Classmate", "Teammate",
+    "Client", "Manager", "Colleague", "Other",
+)
+PREFERRED_TONES = (
+    "Casual", "Friendly", "Professional", "Formal",
+    "Respectful", "Empathetic", "Direct",
+)
+CATEGORY_DISPLAY_MODES = ("Standard labels", "Priority labels")
+PRIORITY_CODES = ("P0", "P1", "P2")
+RESPONSE_STYLE_CYCLE = ("formal", "concise", "warm")
+TONE_RESPONSE_STYLES = {
+    "Casual": "warm",
+    "Friendly": "warm",
+    "Professional": "formal",
+    "Formal": "formal",
+    "Respectful": "formal",
+    "Empathetic": "warm",
+    "Direct": "concise",
+}
 
 
 def strip_reply_label(reply):
@@ -506,6 +668,405 @@ def strip_reply_label(reply):
     return reply
 
 
+def infer_relationship(sender, message_history=()):
+    sender_name = sender.casefold()
+    context = " ".join(
+        f'{item.get("sender", "")} {item.get("message", "")}'
+        for item in message_history
+        if str(item.get("sender", "")).casefold() == sender_name
+    ).casefold()
+    clues = f"{sender_name} {context}"
+    if any(title in clues for title in ("lecturer", "professor", "teacher")):
+        return "Lecturer"
+    if any(title in clues for title in ("friend", "bestie")):
+        return "Friend"
+    if any(title in clues for title in ("family", "mum", "mom", "dad", "sister", "brother")):
+        return "Family"
+    if any(title in clues for title in ("classmate", "student")):
+        return "Classmate"
+    if any(title in clues for title in ("teammate", "team mate")):
+        return "Teammate"
+    if any(title in clues for title in ("client", "customer")):
+        return "Client"
+    if "manager" in clues or sender_name in ("boss", "pm"):
+        return "Manager"
+    if "colleague" in clues or "coworker" in clues:
+        return "Colleague"
+    return "Other"
+
+
+def default_sender_profile(sender, message_history=()):
+    relationship = infer_relationship(sender, message_history)
+    suggested_tone = {
+        "Lecturer": "Respectful",
+        "Friend": "Casual",
+        "Client": "Formal",
+        "Family": "Friendly",
+        "Classmate": "Friendly",
+        "Teammate": "Friendly",
+        "Manager": "Professional",
+        "Colleague": "Professional",
+        "Other": "Professional",
+    }[relationship]
+    return {
+        "name": sender,
+        "relationship_type": relationship,
+        "preferred_tone": suggested_tone,
+    }
+
+
+def validate_sender_profiles(rows):
+    profiles = []
+    seen_senders = set()
+    for row in rows:
+        if not isinstance(row, dict):
+            raise ValueError("Each relationship and tone map row must be an object.")
+
+        # Migrate the original profile schema without discarding saved preferences.
+        sender = row.get("name", row.get("sender"))
+        relationship = row.get("relationship_type", row.get("relationship"))
+        tone = row.get("preferred_tone")
+        if tone is None:
+            tone = {
+                "Formal": "Formal",
+                "Warm": "Friendly",
+                "Concise": "Direct",
+            }.get(row.get("response_style"))
+        relationship = {
+            "Executive": "Manager",
+            "Human resources": "Other",
+            "Direct report": "Teammate",
+            "Unknown": "Other",
+        }.get(relationship, relationship)
+        if sender is None and relationship is None and tone is None:
+            continue
+        if not isinstance(sender, str) or not sender.strip() or len(sender.strip()) > 200:
+            raise ValueError("Each contact needs a name of 1–200 characters.")
+        sender = sender.strip()
+        if sender.casefold() in seen_senders:
+            raise ValueError(f"Contact “{sender}” appears more than once.")
+        if relationship not in RELATIONSHIPS:
+            raise ValueError(f"Choose a valid relationship for {sender}.")
+        if tone not in PREFERRED_TONES:
+            raise ValueError(f"Choose a valid preferred tone for {sender}.")
+        seen_senders.add(sender.casefold())
+        profiles.append({
+            "name": sender,
+            "relationship_type": relationship,
+            "preferred_tone": tone,
+        })
+    return profiles
+
+
+def load_sender_profiles(messages):
+    senders = dict.fromkeys(str(message["sender"]) for message in messages)
+    if RELATIONSHIP_MAP_FILE.exists():
+        try:
+            saved_profiles = validate_sender_profiles(
+                json.loads(RELATIONSHIP_MAP_FILE.read_text(encoding="utf-8"))
+            )
+        except (OSError, json.JSONDecodeError, ValueError) as error:
+            st.error(f"Could not load the saved relationship and tone map: {error}")
+            st.stop()
+        known_senders = {profile["name"].casefold() for profile in saved_profiles}
+        saved_profiles.extend(
+            default_sender_profile(sender, messages)
+            for sender in senders
+            if sender.casefold() not in known_senders
+        )
+        return saved_profiles
+    return [default_sender_profile(sender, messages) for sender in senders]
+
+
+def get_sender_profile(message, profiles):
+    sender = str(message.get("sender", ""))
+    return next(
+        (profile for profile in profiles if profile["name"].casefold() == sender.casefold()),
+        default_sender_profile(sender, [message]),
+    )
+
+
+def with_sender_profile(message, profile):
+    return {**message, "sender_relationship": profile["relationship_type"]}
+
+
+def sender_policy(profile):
+    sender_key = profile["name"].casefold()
+    preferred_style = TONE_RESPONSE_STYLES[profile["preferred_tone"]]
+    style = st.session_state["reply_feedback"]["style_overrides"].get(
+        sender_key, preferred_style
+    )
+    return {
+        "response_style": style,
+        "preferred_tone": profile["preferred_tone"],
+    }
+
+
+def default_category_display():
+    return {
+        "mode": "Standard labels",
+        "urgent": "P0",
+        "wait_until_morning": "P2",
+    }
+
+
+def load_category_display():
+    if not CATEGORY_DISPLAY_FILE.exists():
+        return default_category_display()
+    try:
+        settings = json.loads(CATEGORY_DISPLAY_FILE.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        st.error(f"Could not load category display settings: {error}")
+        st.stop()
+    defaults = default_category_display()
+    if isinstance(settings, dict) and settings.get("mode") == "Priority codes":
+        settings["mode"] = "Priority labels"
+    if (
+        not isinstance(settings, dict)
+        or settings.get("mode") not in CATEGORY_DISPLAY_MODES
+        or settings.get("urgent") not in PRIORITY_CODES
+        or settings.get("wait_until_morning") not in PRIORITY_CODES
+    ):
+        st.error("Saved category display settings contain invalid values.")
+        st.stop()
+    return {key: settings.get(key, value) for key, value in defaults.items()}
+
+
+def category_display_label(result):
+    if result is None:
+        return "Not analyzed"
+    if st.session_state["category_display"]["mode"] == "Priority labels":
+        category = result.get("category")
+        if category in ("urgent", "wait_until_morning"):
+            return st.session_state["category_display"][category]
+        if category == "needs_human_review":
+            return "P-1"
+    return result.get("classification", "Not analyzed")
+
+
+def apply_category_display(edited_settings):
+    settings = {
+        "mode": edited_settings["mode"],
+        "urgent": edited_settings["urgent"],
+        "wait_until_morning": edited_settings["wait_until_morning"],
+    }
+    if (
+        settings["mode"] not in CATEGORY_DISPLAY_MODES
+        or settings["urgent"] not in PRIORITY_CODES
+        or settings["wait_until_morning"] not in PRIORITY_CODES
+    ):
+        st.error("Choose valid category display settings.")
+        return False
+    try:
+        CATEGORY_DISPLAY_FILE.write_text(
+            json.dumps(settings, indent=2) + "\n",
+            encoding="utf-8",
+        )
+    except OSError as error:
+        st.error(f"Could not save category display settings: {error}")
+        return False
+    st.session_state["category_display"] = settings
+    return True
+
+
+def load_reply_feedback():
+    if not REPLY_FEEDBACK_FILE.exists():
+        return {"ratings": {}, "style_overrides": {}}
+    try:
+        saved = json.loads(REPLY_FEEDBACK_FILE.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        st.error(f"Could not load reply feedback: {error}")
+        st.stop()
+    if not isinstance(saved, dict):
+        st.error("Saved reply feedback has an invalid format.")
+        st.stop()
+    ratings = saved.get("ratings", {})
+    overrides = saved.get("style_overrides", {})
+    if (
+        not isinstance(ratings, dict)
+        or not isinstance(overrides, dict)
+        or any(
+            not isinstance(entry, dict)
+            or entry.get("rating") not in ("up", "down")
+            or not isinstance(entry.get("sender"), str)
+            or entry.get("style") not in RESPONSE_STYLE_CYCLE
+            for entry in ratings.values()
+        )
+        or any(style not in RESPONSE_STYLE_CYCLE for style in overrides.values())
+    ):
+        st.error("Saved reply feedback has invalid entries.")
+        st.stop()
+    return {"ratings": ratings, "style_overrides": overrides}
+
+
+def record_reply_feedback(message_id, rating):
+    analysis = st.session_state["message_analyses"].get(message_id)
+    message = next(
+        (item for item in messages if str(item["id"]) == str(message_id)),
+        None,
+    )
+    if (
+        analysis is None
+        or message is None
+        or rating not in ("up", "down")
+        or not analysis["reply"].get("suggested_reply")
+    ):
+        st.session_state["feedback_notice"] = "This reply is no longer available to rate."
+        return
+
+    current = st.session_state["reply_feedback"]
+    ratings = dict(current["ratings"])
+    previous_rating = ratings.get(str(message_id), {}).get("rating")
+    if previous_rating == rating:
+        ratings.pop(str(message_id))
+    else:
+        profile = get_sender_profile(message, st.session_state["sender_profiles"])
+        ratings[str(message_id)] = {
+            "sender": profile["name"],
+            "rating": rating,
+            "style": sender_policy(profile)["response_style"],
+        }
+
+    sender_key = message["sender"].casefold()
+    sender_ratings = [
+        entry for entry in ratings.values()
+        if entry["sender"].casefold() == sender_key
+    ]
+    up_count = sum(entry["rating"] == "up" for entry in sender_ratings)
+    down_count = sum(entry["rating"] == "down" for entry in sender_ratings)
+    overrides = dict(current["style_overrides"])
+    if down_count > up_count:
+        latest_down_style = next(
+            entry["style"] for entry in reversed(list(ratings.values()))
+            if entry["sender"].casefold() == sender_key and entry["rating"] == "down"
+        )
+        style_index = RESPONSE_STYLE_CYCLE.index(latest_down_style)
+        overrides[sender_key] = RESPONSE_STYLE_CYCLE[
+            (style_index + 1) % len(RESPONSE_STYLE_CYCLE)
+        ]
+    elif up_count > down_count:
+        latest_up_style = next(
+            entry["style"] for entry in reversed(list(ratings.values()))
+            if entry["sender"].casefold() == sender_key and entry["rating"] == "up"
+        )
+        overrides[sender_key] = latest_up_style
+    else:
+        overrides.pop(sender_key, None)
+
+    updated = {"ratings": ratings, "style_overrides": overrides}
+    try:
+        REPLY_FEEDBACK_FILE.write_text(
+            json.dumps(updated, ensure_ascii=False, indent=2) + "\n",
+            encoding="utf-8",
+        )
+    except OSError as error:
+        st.session_state["feedback_notice"] = f"Could not save reply feedback: {error}"
+        return
+    st.session_state["reply_feedback"] = updated
+    for existing_message in messages:
+        existing_analysis = st.session_state["message_analyses"].get(
+            existing_message["id"]
+        )
+        if (
+            not existing_analysis
+            or existing_message["sender"].casefold() != sender_key
+        ):
+            continue
+        existing_profile = get_sender_profile(
+            existing_message, st.session_state["sender_profiles"]
+        )
+        agent_message = with_sender_profile(existing_message, existing_profile)
+        policy = sender_policy(existing_profile)
+        reply = generate_reply(agent_message, existing_analysis["result"], policy)
+        existing_analysis["result"]["suggested_reply"] = reply["suggested_reply"]
+        existing_analysis["reply"] = reply
+    st.session_state["feedback_notice"] = (
+        "Reply preference updated from your feedback."
+        if rating == "down" and previous_rating != "down"
+        else "Reply feedback saved."
+    )
+
+
+def tone_explanation(profile):
+    relationship = profile["relationship_type"]
+    tone = profile["preferred_tone"]
+    explanations = {
+        "Lecturer": "Respectful, professional wording is prioritized for a lecturer.",
+        "Friend": "A casual, friendly register suits a personal conversation with a friend.",
+        "Client": "Formal, professional wording supports clear client communication.",
+    }
+    explanation = explanations.get(
+        relationship,
+        f"{tone} wording follows your preference for a {relationship.lower()}.",
+    )
+    return explanation
+
+
+def visible_contact_tone(profile):
+    relationship = profile["relationship_type"]
+    tone = profile["preferred_tone"]
+    combined_tones = {
+        ("Lecturer", "Respectful"): "Respectful + Professional",
+        ("Friend", "Casual"): "Casual + Friendly",
+        ("Friend", "Friendly"): "Casual + Friendly",
+        ("Client", "Formal"): "Formal + Professional",
+    }
+    return combined_tones.get((relationship, tone), tone)
+
+
+def relationship_map_dot(profiles):
+    quote = lambda label: json.dumps(str(label), ensure_ascii=False)
+    category_styles = {
+        "Family": ("♥", "#fce7f3", "#be185d"),
+        "Friend": ("★", "#fef3c7", "#b45309"),
+        "Lecturer": ("▣", "#ede9fe", "#6d28d9"),
+        "Classmate": ("◉", "#dbeafe", "#1d4ed8"),
+        "Teammate": ("◆", "#dcfce7", "#15803d"),
+        "Client": ("⬟", "#ffedd5", "#c2410c"),
+        "Manager": ("▲", "#fee2e2", "#b91c1c"),
+        "Colleague": ("●", "#e0f2fe", "#0369a1"),
+        "Other": ("○", "#f1f5f9", "#475569"),
+    }
+    lines = [
+        "digraph relationship_tone_map {",
+        'graph [rankdir=TB, bgcolor="transparent", nodesep=0.35, ranksep=0.55];',
+        'node [shape=box, style="rounded,filled", fontname="Arial", fontsize=11, '
+        'color="#bfdbfe", fillcolor="#eff6ff", fontcolor="#1e3a8a", margin="0.18,0.1"];',
+        'edge [color="#94a3b8", penwidth=1.4, arrowhead=none];',
+        f'map_root [label={quote("Relationship & Tone Map")}, fillcolor="#2563eb", '
+        'color="#2563eb", fontcolor="white", fontsize=14];',
+    ]
+    if not profiles:
+        lines.append(f'empty [label={quote("No contacts mapped yet")}];')
+        lines.append("map_root -> empty;")
+    grouped_profiles = {}
+    for profile in profiles:
+        grouped_profiles.setdefault(profile["relationship_type"], []).append(profile)
+    for relationship_index, (relationship, contacts) in enumerate(grouped_profiles.items()):
+        icon, fill, color = category_styles[relationship]
+        relationship_id = f"relationship_{relationship_index}"
+        lines.append(
+            f'{relationship_id} [label={quote(f"{icon}  {relationship}")}, '
+            f'fillcolor={quote(fill)}, color={quote(color)}, '
+            f'fontcolor={quote(color)}];'
+        )
+        lines.append(f"map_root -> {relationship_id};")
+        for contact_index, profile in enumerate(contacts):
+            contact_id = f"contact_{relationship_index}_{contact_index}"
+            contact_label = (
+                f'{profile["name"]}\nTone: {visible_contact_tone(profile)}'
+            )
+            lines.append(
+                f'{contact_id} [label={quote(contact_label)}, '
+                f'tooltip={quote(tone_explanation(profile))}, '
+                f'fillcolor={quote(fill)}, color={quote(color)}, '
+                f'fontcolor="#1e293b"];'
+            )
+            lines.append(f"{relationship_id} -> {contact_id};")
+    lines.append("}")
+    return "\n".join(lines)
+
+
 for saved_analysis in st.session_state["message_analyses"].values():
     saved_reply = saved_analysis.get("reply")
     if isinstance(saved_reply, dict):
@@ -515,7 +1076,7 @@ for saved_analysis in st.session_state["message_analyses"].values():
 
 
 def is_valid_login(username, password):
-    return username == "test" and password == "1234"
+    return username == "User" and password == "1234"
 
 
 if not st.session_state["is_authenticated"]:
@@ -556,17 +1117,31 @@ if not st.session_state["is_authenticated"]:
 with DATA_FILE.open("r", encoding="utf-8") as f:
     messages = json.load(f)
 
+if "sender_profiles" not in st.session_state:
+    st.session_state["sender_profiles"] = load_sender_profiles(messages)
+if "category_display" not in st.session_state:
+    st.session_state["category_display"] = load_category_display()
+if "reply_feedback" not in st.session_state:
+    st.session_state["reply_feedback"] = load_reply_feedback()
+
 st.session_state["read_message_ids"].intersection_update(
     str(message["id"]) for message in messages
 )
 st.session_state["resolved_message_ids"].intersection_update(
     str(message["id"]) for message in messages
 )
+if st.session_state.get("feedback_notice"):
+    st.info(st.session_state.pop("feedback_notice"))
 
 st.markdown(
-    f"<style>:root {{ --app-font-size: {FONT_SIZES[st.session_state['font_size']]}px; }}</style>",
+    f"<style>:root {{ --app-font-size: "
+    f"{MOBILE_FONT_SIZES[st.session_state['font_size']] if st.session_state['layout_mode'] == 'mobile' else FONT_SIZES[st.session_state['font_size']]}px; "
+    "}</style>",
     unsafe_allow_html=True,
 )
+if st.session_state["layout_mode"] == "mobile":
+    with st.container(key="mobile-layout"):
+        st.empty()
 
 
 @st.dialog("Urgent message", width="medium")
@@ -578,8 +1153,11 @@ def show_urgent_message(message, analysis):
 def show_message_details(message, analysis):
     show_message_details_content(message, analysis)
     if not analysis and st.button("Analyze message", key=f"dialog-analyze-{message['id']}"):
-        result = classify_message(message)
-        reply = generate_reply(message, result)
+        profile = get_sender_profile(message, st.session_state["sender_profiles"])
+        agent_message = with_sender_profile(message, profile)
+        policy = sender_policy(profile)
+        result = classify_message(agent_message, policy)
+        reply = generate_reply(agent_message, result, policy)
         st.session_state["message_analyses"][message["id"]] = {
             "result": result,
             "reply": reply,
@@ -591,6 +1169,7 @@ def show_message_details(message, analysis):
 def show_message_details_content(message, analysis):
     message_id = html.escape(str(message["id"]))
     sender = html.escape(str(message["sender"]))
+    app_name = html.escape(str(message.get("app") or "Not provided"))
     received_at = html.escape(str(message.get("received_at") or "Not provided"))
     full_message = html.escape(str(message["message"]))
     urgency_badge = '<span class="urgency-badge" style="background-color:#6c757d">Not assessed</span>'
@@ -600,7 +1179,7 @@ def show_message_details_content(message, analysis):
     if analysis:
         result = analysis["result"]
         reply = analysis["reply"]
-        category = result["classification"]
+        category = category_display_label(result)
         urgency_badge = urgency_badge_html(result)
         extra_content = (
             '<p><strong>Demo confidence (not calibrated):</strong> '
@@ -635,15 +1214,27 @@ def show_message_details_content(message, analysis):
             queue_footer = "Needs your decision before it can enter morning review."
     else:
         queue_footer = "Analyze this message to decide whether it belongs in morning review."
+    if category_key == "needs_human_review":
+        category_markup = (
+            '<div class="popup-category-review">'
+            '<strong>Category:</strong>'
+            f'<span>{html.escape(str(category))}</span>'
+            '</div>'
+        )
+    else:
+        category_markup = (
+            f'<div><strong>Category:</strong> {html.escape(str(category))}</div>'
+        )
     st.markdown(
         '<div class="popup-header">'
         f'<div><strong>Case ID:</strong> {message_id}</div>'
-        f'<div><strong>Category:</strong> {html.escape(str(category))}</div>'
+        f'{category_markup}'
         f'<div class="popup-urgency"><strong>Urgency level:</strong> '
         f'{urgency_badge}</div>'
         '</div>'
         '<div class="popup-body">'
         f'<p><strong>Sender: </strong>{sender}</p>'
+        f'<p><strong>From: </strong>{app_name}</p>'
         f'<p><strong>Received at: </strong>{received_at}</p>'
         f'<p class="popup-message"><strong>Message: </strong>{full_message}</p>'
         f'{extra_content}'
@@ -771,7 +1362,7 @@ def render_message_card(message, section, *, queued=False, history=False):
     suggested_reply = reply["suggested_reply"] if reply else None
     is_unread = message_id not in st.session_state["read_message_ids"]
     card_state = "unread" if is_unread else "read"
-    category_label = result["classification"] if result else "Not analyzed"
+    category_label = category_display_label(result)
     urgency_html = (
         urgency_badge_html(result)
         if result
@@ -786,7 +1377,7 @@ def render_message_card(message, section, *, queued=False, history=False):
         if suggested_reply
         else "No safe reply draft is available."
     )
-    from_label = "Silencer"
+    from_label = html.escape(str(message.get("app") or "Not provided"))
 
     with st.container(
         key=f"message-card-{card_state}-{section}-{message_id}",
@@ -893,14 +1484,45 @@ def render_message_card(message, section, *, queued=False, history=False):
                     width="stretch",
                 ):
                     with st.spinner("Re-analyzing message..."):
-                        result = classify_message(message)
+                        profile = get_sender_profile(
+                            message, st.session_state["sender_profiles"]
+                        )
+                        agent_message = with_sender_profile(message, profile)
+                        policy = sender_policy(profile)
+                        result = classify_message(agent_message, policy)
                         st.session_state["message_analyses"][message["id"]] = {
                             "result": result,
-                            "reply": generate_reply(message, result),
+                            "reply": generate_reply(agent_message, result, policy),
                         }
                         st.session_state["human_review_decisions"].pop(message["id"], None)
                         st.session_state["queue_confirmed_ids"].discard(message_id)
                     st.rerun()
+
+            if suggested_reply:
+                current_rating = st.session_state["reply_feedback"]["ratings"].get(
+                    message_id, {}
+                ).get("rating")
+                feedback_columns = st.columns([1, 1, 8])
+                with feedback_columns[0]:
+                    st.button(
+                        " ",
+                        key=f"feedback-up-{section}-{message_id}",
+                        icon=":material/thumb_up:",
+                        help="This reply was helpful",
+                        type="primary" if current_rating == "up" else "secondary",
+                        on_click=record_reply_feedback,
+                        args=(message_id, "up"),
+                    )
+                with feedback_columns[1]:
+                    st.button(
+                        " ",
+                        key=f"feedback-down-{section}-{message_id}",
+                        icon=":material/thumb_down:",
+                        help="This reply needs improvement",
+                        type="primary" if current_rating == "down" else "secondary",
+                        on_click=record_reply_feedback,
+                        args=(message_id, "down"),
+                    )
 
             if suggested_reply and st.session_state.get("copy_reply_visible") == message_id:
                 st.code(suggested_reply)
@@ -917,10 +1539,13 @@ if unanalyzed_messages:
         )
     with st.spinner(f"Analyzing {len(unanalyzed_messages)} messages..."):
         for message in unanalyzed_messages:
-            result = classify_message(message)
+            profile = get_sender_profile(message, st.session_state["sender_profiles"])
+            agent_message = with_sender_profile(message, profile)
+            policy = sender_policy(profile)
+            result = classify_message(agent_message, policy)
             analyses[message["id"]] = {
                 "result": result,
-                "reply": generate_reply(message, result),
+                "reply": generate_reply(agent_message, result, policy),
             }
 
 queued_messages = get_queue(
@@ -952,8 +1577,8 @@ urgent_items = [
 ]
 urgent_count = len(urgent_items)
 with st.container(key="main-header"):
-    logo_col, brand_col, settings_col, logout_col = st.columns(
-        [0.16, 0.48, 0.19, 0.17], vertical_alignment="center"
+    logo_col, brand_col, layout_col, settings_col, logout_col = st.columns(
+        [0.14, 0.40, 0.10, 0.18, 0.16], vertical_alignment="center"
     )
     with logo_col:
         with st.container(key="app-icon"):
@@ -964,11 +1589,44 @@ with st.container(key="main-header"):
             '<div class="brand-subtitle">Silence the noise. Surface what matters.</div>',
             unsafe_allow_html=True,
         )
+    with layout_col:
+        layout_icon = (
+            ":material/desktop_windows:"
+            if st.session_state["layout_mode"] == "desktop"
+            else ":material/smartphone:"
+        )
+        if st.button(
+            " ",
+            key="layout_toggle_button",
+            icon=layout_icon,
+            help="Switch between desktop and mobile layout",
+            width="stretch",
+        ):
+            st.session_state["layout_mode"] = (
+                "mobile"
+                if st.session_state["layout_mode"] == "desktop"
+                else "desktop"
+            )
+            st.rerun()
     with settings_col:
-        if st.button("Settings", key="settings_button", icon=":material/settings:", width="stretch"):
+        settings_label = " " if st.session_state["layout_mode"] == "mobile" else "Settings"
+        if st.button(
+            settings_label,
+            key="settings_button",
+            icon=":material/settings:",
+            help="Settings",
+            width="stretch",
+        ):
             st.session_state["show_settings"] = not st.session_state["show_settings"]
     with logout_col:
-        if st.button("Log out", key="logout_button", icon=":material/logout:", width="stretch"):
+        logout_label = " " if st.session_state["layout_mode"] == "mobile" else "Log out"
+        if st.button(
+            logout_label,
+            key="logout_button",
+            icon=":material/logout:",
+            help="Log out",
+            width="stretch",
+        ):
             st.session_state["is_authenticated"] = False
             st.session_state["user_name"] = ""
             st.session_state["read_message_ids"] = set()
@@ -978,6 +1636,8 @@ with st.container(key="main-header"):
 
 if st.session_state["show_settings"]:
     with st.container(border=True):
+        if st.session_state["settings_notice"]:
+            st.success(st.session_state.pop("settings_notice"))
         mode = os.environ.get("SILENCER_MODE", "mock")
         st.write(f"Analysis mode: **{mode}**")
         st.selectbox(
@@ -986,6 +1646,192 @@ if st.session_state["show_settings"]:
             key="font_size",
             help="Choose Regular, Large, or Extra large text for the app.",
         )
+        category_display_mode = st.selectbox(
+            "Message category label",
+            CATEGORY_DISPLAY_MODES,
+            key="category_display_mode",
+            index=CATEGORY_DISPLAY_MODES.index(
+                st.session_state["category_display"]["mode"]
+            ),
+        )
+        if category_display_mode == "Priority labels":
+            urgent_priority = st.selectbox(
+                "Urgent category",
+                PRIORITY_CODES,
+                key="urgent_priority",
+                index=PRIORITY_CODES.index(
+                    st.session_state["category_display"]["urgent"]
+                ),
+            )
+            non_urgent_priority = st.selectbox(
+                "Not urgent category",
+                PRIORITY_CODES,
+                key="non_urgent_priority",
+                index=PRIORITY_CODES.index(
+                    st.session_state["category_display"]["wait_until_morning"]
+                ),
+            )
+            st.caption("P-1 always means Needs Human Review.")
+        else:
+            urgent_priority = st.session_state["category_display"]["urgent"]
+            non_urgent_priority = st.session_state["category_display"]["wait_until_morning"]
+        if st.button(
+            "Apply category labels",
+            key="apply_category_labels",
+            type="primary",
+        ):
+            if apply_category_display({
+                "mode": category_display_mode,
+                "urgent": urgent_priority,
+                "wait_until_morning": non_urgent_priority,
+            }):
+                st.session_state["settings_notice"] = "Category label settings applied."
+                st.rerun()
+        st.toggle(
+            "Show Relationship & Tone Map",
+            key="show_relationship_map",
+            help="Show or hide contact relationships and preferred tones.",
+        )
+        if st.session_state["show_relationship_map"]:
+            st.subheader("Relationship & Tone Map")
+            st.caption(
+                "Personalize draft replies with each contact's relationship and preferred "
+                "tone. New profiles are preliminary suggestions for you to review; "
+                "these settings never change message urgency."
+            )
+            st.graphviz_chart(
+                relationship_map_dot(st.session_state["sender_profiles"]),
+                width="stretch",
+                alt="Contact profiles grouped by relationship, with preferred tone shown on each contact",
+            )
+            profiles = st.session_state["sender_profiles"]
+            contact_options = ["Add contact"] + [
+                profile["name"] for profile in profiles
+            ]
+            selected_contact = st.selectbox(
+                "Contact profile",
+                contact_options,
+                key="relationship_profile_selection",
+            )
+            selected_profile = next(
+                (
+                    profile for profile in profiles
+                    if profile["name"] == selected_contact
+                ),
+                None,
+            )
+            profile_key = (
+                selected_profile["name"].casefold().replace(" ", "_")
+                if selected_profile else "new"
+            )
+            relationship_default = (
+                selected_profile["relationship_type"]
+                if selected_profile else RELATIONSHIPS[-1]
+            )
+            tone_default = (
+                selected_profile["preferred_tone"]
+                if selected_profile else "Professional"
+            )
+            with st.form("relationship_profile_form"):
+                input_columns = st.columns([1.3, 1, 1, 0.7])
+                with input_columns[0]:
+                    contact_name = st.text_input(
+                        "Name",
+                        value=selected_profile["name"] if selected_profile else "",
+                        max_chars=200,
+                        key=f"relationship_name_{profile_key}",
+                    )
+                with input_columns[1]:
+                    relationship_type = st.selectbox(
+                        "Relationship Type",
+                        RELATIONSHIPS,
+                        index=RELATIONSHIPS.index(relationship_default),
+                        key=f"relationship_type_{profile_key}",
+                    )
+                with input_columns[2]:
+                    preferred_tone = st.selectbox(
+                        "Preferred Tone",
+                        PREFERRED_TONES,
+                        index=PREFERRED_TONES.index(tone_default),
+                        key=f"preferred_tone_{profile_key}",
+                    )
+                with input_columns[3]:
+                    save_relationship_map = st.form_submit_button(
+                        "Save profile",
+                        key="save_relationship_profile",
+                        type="primary",
+                        width="stretch",
+                    )
+            if save_relationship_map:
+                try:
+                    if not contact_name.strip():
+                        raise ValueError("Enter a contact name before saving.")
+                    updated_profile = validate_sender_profiles([{
+                        "name": contact_name,
+                        "relationship_type": relationship_type,
+                        "preferred_tone": preferred_tone,
+                    }])[0]
+                    next_profiles = list(profiles)
+                    existing_index = next(
+                        (
+                            index for index, profile in enumerate(next_profiles)
+                            if profile["name"].casefold()
+                            == selected_contact.casefold()
+                        ),
+                        None,
+                    )
+                    duplicate_index = next(
+                        (
+                            index for index, profile in enumerate(next_profiles)
+                            if profile["name"].casefold()
+                            == updated_profile["name"].casefold()
+                        ),
+                        None,
+                    )
+                    if (
+                        duplicate_index is not None
+                        and duplicate_index != existing_index
+                    ):
+                        raise ValueError(
+                            f'Contact “{updated_profile["name"]}” already exists.'
+                        )
+                    if existing_index is None:
+                        next_profiles.append(updated_profile)
+                    else:
+                        next_profiles[existing_index] = updated_profile
+                    next_profiles = validate_sender_profiles(next_profiles)
+                except (OSError, ValueError) as error:
+                    st.error(f"Could not save the Relationship & Tone Map: {error}")
+                else:
+                    try:
+                        RELATIONSHIP_MAP_FILE.write_text(
+                            json.dumps(next_profiles, ensure_ascii=False, indent=2) + "\n",
+                            encoding="utf-8",
+                        )
+                    except OSError as error:
+                        st.error(f"Could not save the Relationship & Tone Map: {error}")
+                    else:
+                        st.session_state["sender_profiles"] = next_profiles
+                        for message in messages:
+                            analysis = st.session_state["message_analyses"].get(
+                                message["id"]
+                            )
+                            if not analysis:
+                                continue
+                            profile = get_sender_profile(message, next_profiles)
+                            agent_message = with_sender_profile(message, profile)
+                            policy = sender_policy(profile)
+                            reply = generate_reply(
+                                agent_message, analysis["result"], policy
+                            )
+                            analysis["result"]["suggested_reply"] = (
+                                reply["suggested_reply"]
+                            )
+                            analysis["reply"] = reply
+                        st.session_state["settings_notice"] = (
+                            "Relationship & Tone Map saved."
+                        )
+                        st.rerun()
         st.write("API credentials are not displayed here.")
 
 analyses = st.session_state["message_analyses"]

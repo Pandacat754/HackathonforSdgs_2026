@@ -59,9 +59,13 @@ HackathonforSdgs_2026/
 {
   "id": "msg001",
   "sender": "Project Manager",
+  "app": "Teams",
   "message": "Can you send me the final report tonight?"
 }
 ```
+
+`app` identifies the source platform and must be one of `Teams`, `Gmail`,
+`Outlook`, or `Whatsapp`. Message cards and detail popups display it as `From:`.
 
 ## AI Classification Interface
 
@@ -105,6 +109,37 @@ Expected Output:
     "requires_user_confirmation": True
 }
 ```
+
+### Relationship & Tone Map
+
+Open **Settings** and toggle **Show Relationship & Tone Map** to show or hide
+the mind map and profile input form. Choose an existing contact to update or
+select **Add contact**, then enter a name, relationship type, and preferred
+tone. Saving immediately refreshes the mind map and any affected draft replies.
+Relationship categories are parent nodes; contact nodes show the selected tone,
+with a tooltip explaining the tone choice. The form supports Family, Friend,
+Lecturer, Classmate, Teammate, Client, Manager, Colleague, and Other
+relationships, and Casual, Friendly, Professional, Formal, Respectful,
+Empathetic, and Direct tones.
+
+New contacts receive a preliminary relationship and tone suggestion based on
+the sender label and available message history. Review and adjust these
+suggestions in Settings. Lecturer, Friend, and Client profiles default to
+respectful/professional, casual/friendly, and formal/professional wording,
+respectively. Relationship and tone preferences are provided to the agent as
+personalization context; they never affect urgency or authorize commitments.
+Saved profiles are stored locally in `data/relationship_map.json`. Existing
+saved relationship-map profiles are migrated when loaded.
+
+Use **Message category labels** to show standard category names or priority
+codes. Priority-code mode defaults to P0 for urgent, P2 for not urgent, and -1
+for messages needing manual review; the urgent and not-urgent codes can be
+changed in Settings. These labels only affect display, not triage decisions.
+Display preferences are stored locally in `data/category_display.json`.
+Priority mode always displays human-review messages as **P-1**. Thumbs-up or
+thumbs-down reply ratings are stored locally in `data/reply_feedback.json` and
+adjust the preferred response style for that sender. Use the computer/phone
+icon in the heading to switch between desktop and compact mobile layouts.
 
 ## Queue Interface
 

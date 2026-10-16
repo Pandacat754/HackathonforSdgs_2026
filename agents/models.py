@@ -9,6 +9,11 @@ CATEGORIES = {
     "needs_human_review": ("Needs Human Review", "ask_user_to_review"),
 }
 REPLY_STYLES = {"receipt", "deferred", "none"}
+APPS = {"Teams", "Gmail", "Outlook", "Whatsapp"}
+PREFERRED_TONES = {
+    "Casual", "Friendly", "Professional", "Formal",
+    "Respectful", "Empathetic", "Direct",
+}
 
 
 def unit_number(value):
@@ -40,13 +45,15 @@ def normalise_input(message, policy=None):
     if "message" in message and "body" in message and message["body"] != body:
         raise ValueError("Conflicting message and body fields")
     clean = {"body": body.strip()}
-    for key in ("id", "sender", "sender_relationship", "channel",
+    for key in ("id", "sender", "app", "sender_relationship", "channel",
                 "received_at", "user_workday_starts_at", "deadline_at"):
         value = message.get(key)
         if value is not None:
             if not isinstance(value, str) or len(value) > 500:
                 raise ValueError("Invalid metadata")
             clean[key] = value
+    if "app" in message and message["app"] not in APPS:
+        raise ValueError("Unsupported app")
     for key in ("received_at", "user_workday_starts_at", "deadline_at"):
         timestamp(clean.get(key))
     received = timestamp(clean.get("received_at"))
@@ -62,7 +69,19 @@ def normalise_input(message, policy=None):
     language = policy.get("reply_language", "auto")
     if language not in ("auto", "en", "zh"):
         raise ValueError("Unsupported reply language")
-    return clean, {"confidence_threshold": threshold, "reply_language": language}
+    response_style = policy.get("response_style", "formal")
+    if response_style not in ("formal", "warm", "concise"):
+        raise ValueError("Unsupported response style")
+    preferred_tone = policy.get("preferred_tone", "Professional")
+    if preferred_tone not in PREFERRED_TONES:
+        raise ValueError("Unsupported preferred tone")
+    clean_policy = {
+        "confidence_threshold": threshold,
+        "reply_language": language,
+        "response_style": response_style,
+        "preferred_tone": preferred_tone,
+    }
+    return clean, clean_policy
 
 
 def parse_decision(raw):

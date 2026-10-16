@@ -35,9 +35,12 @@ python3 -m pip install -r requirements.txt
 python3 -m streamlit run app.py
 ```
 
-页面使用 `data/sample_messages.json`，默认离线分析；设置 `SILENCER_MODE=llm`
+页面使用 `data/sample_messages.json`，其 `app` 来源可为 Teams、Gmail、Outlook 或 Whatsapp，
+并在卡片和详情弹窗中显示为 `From:`。默认离线分析；设置 `SILENCER_MODE=llm`
 并按下方配置 API 凭据后，才会调用模型。分析结果会在当前 Streamlit session
 中保留，回复草稿复用分类结果；页面不会自动发送消息或写入队列。
+Settings 中的 Relationship & Tone Map 按关系类别组织联系人，并将首选语气
+作为回复个性化上下文；新联系人建议可由用户审核，关系和语气不会改变紧急度。
 
 ## 3. 文件职责
 

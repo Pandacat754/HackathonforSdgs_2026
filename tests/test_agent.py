@@ -12,7 +12,7 @@ from streamlit.testing.v1 import AppTest
 from agents.classifier import classify_message, triage_message
 from agents.reply_generator import generate_reply, generate_suggested_reply
 from agents import llm_client
-from agents.models import CATEGORIES
+from agents.models import APPS, CATEGORIES, normalise_input
 from agents.prompts import build_messages
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -73,10 +73,94 @@ class AgentTests(unittest.TestCase):
             with self.subTest(msg=msg):
                 self.assertEqual(classify_message(msg)["error_code"], "invalid_input")
 
+    def test_app_metadata_is_limited_to_supported_apps(self):
+        for app_name in APPS:
+            clean, _ = normalise_input({"message": "FYI", "app": app_name})
+            self.assertEqual(clean["app"], app_name)
+        with self.assertRaisesRegex(ValueError, "Unsupported app"):
+            normalise_input({"message": "FYI", "app": "Slack"})
+
+        sample_messages = json.loads(
+            (ROOT / "data/sample_messages.json").read_text(encoding="utf-8")
+        )
+        test_cases = json.loads(
+            (ROOT / "data/agent_test_cases.json").read_text(encoding="utf-8")
+        )
+        for message in sample_messages + test_cases:
+            with self.subTest(message_id=message["id"]):
+                self.assertIn(message["app"], APPS)
+        self.assertEqual({message["app"] for message in test_cases}, APPS)
+
     def test_invalid_policy(self):
         for policy in ([], {"confidence_threshold": True}, {"confidence_threshold": float("nan")},
-                       {"confidence_threshold": 2}, {"reply_language": "unknown"}):
+                       {"confidence_threshold": 2}, {"reply_language": "unknown"},
+                       {"response_style": "aggressive"},
+                       {"preferred_tone": "Sarcastic"}):
             self.assertEqual(classify_message({"message": "FYI"}, policy)["error_code"], "invalid_input")
+
+    def test_sender_relationship_and_response_style_shape_safe_drafts(self):
+        message = {"sender": "Project Manager", "message": "Please send the report tonight.",
+                   "sender_relationship": "Manager"}
+        formal = classify_message(message, {"response_style": "formal"})
+        concise = classify_message(message, {"response_style": "concise"})
+        self.assertEqual(formal["category"], concise["category"])
+        self.assertIn("has been received by the assistant", formal["suggested_reply"])
+        self.assertIn("Received by the assistant", concise["suggested_reply"])
+        self.assertNotIn("I will", concise["suggested_reply"])
+
+        alternate = generate_reply(
+            message, formal, {"response_style": "warm"}
+        )
+        self.assertIn("has reached the assistant", alternate["suggested_reply"])
+
+        with patch.object(llm_client, "complete", return_value=response()) as client:
+            classify_message(
+                message,
+                {
+                    "response_style": "formal",
+                    "preferred_tone": "Respectful",
+                },
+                mode="llm",
+            )
+        prompt = json.dumps(client.call_args.args[0], ensure_ascii=False)
+        self.assertIn("Manager", prompt)
+        self.assertIn("formal", prompt)
+        self.assertIn("Respectful", prompt)
+        self.assertIn("seniority must never change urgency", prompt)
+
+    def test_relationship_and_tone_personalize_drafts(self):
+        examples = (
+            (
+                "Lecturer", "Respectful", "formal",
+                "Thank you for your message.",
+                "can be held for the next working period",
+            ),
+            (
+                "Friend", "Casual", "warm",
+                "Thanks for the message!",
+                "can wait for the next working period",
+            ),
+            (
+                "Client", "Formal", "formal",
+                "Thank you for contacting us.",
+                "can be held for the next working period",
+            ),
+        )
+        for relationship, tone, style, prefix, expected_text in examples:
+            with self.subTest(relationship=relationship, tone=tone):
+                message = {
+                    "sender": "Contact",
+                    "sender_relationship": relationship,
+                    "message": "FYI, the notes are ready.",
+                }
+                policy = {
+                    "response_style": style,
+                    "preferred_tone": tone,
+                }
+                result = classify_message(message, policy)
+                reply = generate_reply(message, result, policy)["suggested_reply"]
+                self.assertTrue(reply.startswith(prefix))
+                self.assertIn(expected_text, reply)
 
     def test_queue_uses_supplied_working_date(self):
         msg = {"message": "FYI, notes", "user_workday_starts_at": "2026-10-19T09:00:00+08:00"}
@@ -109,6 +193,19 @@ class AgentTests(unittest.TestCase):
         for category, style in (("urgent", "receipt"), ("needs_human_review", "none")):
             with patch.object(llm_client, "complete", return_value=response(category=category, reply_style=style)):
                 self.assertEqual(classify_message({"message": "Check this"}, mode="llm")["category"], category)
+        with patch.object(
+            llm_client, "complete",
+            return_value=response(category="urgent", reply_style="none"),
+        ):
+            result = classify_message({"message": "Check this"}, mode="llm")
+        self.assertIsNone(result["suggested_reply"])
+        self.assertIsNone(
+            generate_reply(
+                {"message": "Check this"},
+                result,
+                {"response_style": "formal"},
+            )["suggested_reply"]
+        )
 
     def test_live_failure_does_not_silently_use_mock(self):
         with patch.object(llm_client, "complete", side_effect=llm_client.LLMError("secret server body")):
@@ -188,7 +285,7 @@ class AgentTests(unittest.TestCase):
         st.form = lambda *args, **kwargs: form_options.append(kwargs) or nullcontext()
         st.text_input = lambda label, **kwargs: (
             input_options.append((label, kwargs))
-            or {"login_username": "test", "login_password": "wrong"}[kwargs["key"]]
+            or {"login_username": "User", "login_password": "wrong"}[kwargs["key"]]
         )
         st.form_submit_button = lambda label, **kwargs: button_labels.append(label) or True
         st.stop = lambda: (_ for _ in ()).throw(ScriptStopped())
@@ -219,7 +316,7 @@ class AgentTests(unittest.TestCase):
         ))
         self.assertFalse(any("prioritized messages" in str(value) for value in rendered))
         self.assertFalse(any("Demo Account" in str(value) for value in rendered))
-        self.assertFalse(any("Username: test" in str(value) for value in rendered))
+        self.assertFalse(any("Username: User" in str(value) for value in rendered))
         self.assertTrue(any("width: min(100%, 560px)" in str(value) for value in rendered))
         self.assertTrue(any('font-size: 3rem' in str(value) for value in rendered))
         self.assertTrue(any(
@@ -269,6 +366,8 @@ class AgentTests(unittest.TestCase):
         st.container = lambda **kwargs: (
             container_keys.append(kwargs.get("key")) or nullcontext()
         )
+        st.empty = lambda: None
+        st.toggle = lambda label, **kwargs: kwargs.get("value", False)
         st.expander = lambda *args, **kwargs: (
             section_titles.append(args[0]) or nullcontext()
         )
@@ -286,9 +385,9 @@ class AgentTests(unittest.TestCase):
                 app_namespace = runpy.run_path(str(project / "app.py"), run_name="__main__")
         finally:
             os.chdir(previous)
-        self.assertTrue(app_namespace["is_valid_login"]("test", "1234"))
-        self.assertFalse(app_namespace["is_valid_login"]("test", "wrong"))
-        self.assertFalse(app_namespace["is_valid_login"]("other", "1234"))
+        self.assertTrue(app_namespace["is_valid_login"]("User", "1234"))
+        self.assertFalse(app_namespace["is_valid_login"]("User", "wrong"))
+        self.assertFalse(app_namespace["is_valid_login"]("test", "1234"))
         self.assertTrue(any("Welcome back, Test" in str(value) for value in rendered))
         self.assertTrue(any("Silence the noise. Surface what matters." in str(value) for value in rendered))
         self.assertFalse(any("offline " + "demo" in str(value).lower() for value in rendered))
@@ -433,6 +532,42 @@ class AgentTests(unittest.TestCase):
             app_namespace["strip_reply_label"]("Automated assistant draft: Reply text"),
             "Reply text",
         )
+        profiles = app_namespace["validate_sender_profiles"]([
+            {"name": "New manager", "relationship_type": "Manager",
+             "preferred_tone": "Friendly"},
+        ])
+        self.assertEqual(profiles, [{
+            "name": "New manager",
+            "relationship_type": "Manager",
+            "preferred_tone": "Friendly",
+        }])
+        old_profile = app_namespace["validate_sender_profiles"]([{
+            "sender": "Old manager",
+            "relationship": "Manager",
+            "response_style": "Warm",
+            "notes": "Legacy note to discard",
+        }])
+        self.assertEqual(old_profile[0]["preferred_tone"], "Friendly")
+        self.assertNotIn("notes", old_profile[0])
+        tone_map = app_namespace["relationship_map_dot"]([{
+            "name": "Alice Wong",
+            "relationship_type": "Lecturer",
+            "preferred_tone": "Respectful",
+        }])
+        self.assertIn("Lecturer", tone_map)
+        self.assertIn("Alice Wong", tone_map)
+        self.assertIn("Respectful + Professional", tone_map)
+        self.assertNotIn("Notes", tone_map)
+        self.assertIn("tooltip=", tone_map)
+        self.assertIn("relationship_0 -> contact_0_0", tone_map)
+        lecturer_suggestion = app_namespace["default_sender_profile"]("Lecturer")
+        self.assertEqual(lecturer_suggestion["preferred_tone"], "Respectful")
+        history_suggestion = app_namespace["default_sender_profile"](
+            "Alice Wong",
+            [{"sender": "Alice Wong", "message": "As your lecturer, please review this."}],
+        )
+        self.assertEqual(history_suggestion["relationship_type"], "Lecturer")
+        self.assertEqual(history_suggestion["preferred_tone"], "Respectful")
 
     def test_morning_queue_and_inbox_share_message_read_state(self):
         app = AppTest.from_file(str(ROOT / "app.py"), default_timeout=20)
@@ -458,6 +593,189 @@ class AgentTests(unittest.TestCase):
         self.assertNotIn("queue-send-now-msg002", [button.key for button in app.button])
         self.assertTrue(any("Confirmed" in str(item.value) for item in app.markdown))
         self.assertEqual(app.exception, [])
+
+    def test_relationship_map_settings_render(self):
+        app = AppTest.from_file(str(ROOT / "app.py"), default_timeout=20)
+        app.session_state["is_authenticated"] = True
+        app.session_state["category_display"] = {
+            "mode": "Standard labels",
+            "urgent": "P0",
+            "wait_until_morning": "P2",
+        }
+        app.run()
+
+        app.button(key="settings_button").click().run()
+
+        self.assertNotIn("Relationship & Tone Map", [item.value for item in app.subheader])
+        self.assertNotIn("graphviz_chart", [node.type for node in app._tree])
+        self.assertNotIn(
+            "Urgent category", [item.label for item in app.selectbox]
+        )
+        self.assertFalse(any("P-1" in str(item.value) for item in app.caption))
+        app.toggle(key="show_relationship_map").set_value(True).run()
+        self.assertIn("Relationship & Tone Map", [item.value for item in app.subheader])
+        self.assertIn("graphviz_chart", [node.type for node in app._tree])
+        self.assertIn("Contact profile", [item.label for item in app.selectbox])
+        self.assertIn("Name", [item.label for item in app.text_input])
+        self.assertNotIn("data_editor", [node.type for node in app._tree])
+        self.assertNotIn("Notes", [item.label for item in app.text_input])
+        app.toggle(key="show_relationship_map").set_value(False).run()
+        self.assertNotIn("graphviz_chart", [node.type for node in app._tree])
+        self.assertEqual(app.exception, [])
+
+    def test_relationship_tone_form_save_updates_profiles_and_map_source(self):
+        settings_file = ROOT / "data" / "relationship_map.json"
+        previous_settings = (
+            settings_file.read_bytes() if settings_file.exists() else None
+        )
+        try:
+            app = AppTest.from_file(str(ROOT / "app.py"), default_timeout=20)
+            app.session_state["is_authenticated"] = True
+            app.run()
+            app.button(key="settings_button").click().run()
+            app.toggle(key="show_relationship_map").set_value(True).run()
+
+            app.text_input(key="relationship_name_new").set_value("Alice Wong")
+            app.selectbox(key="relationship_type_new").select("Lecturer")
+            app.selectbox(key="preferred_tone_new").select("Respectful")
+            app.button(key="save_relationship_profile").click().run()
+
+            self.assertEqual(app.exception, [])
+            self.assertIn(
+                {
+                    "name": "Alice Wong",
+                    "relationship_type": "Lecturer",
+                    "preferred_tone": "Respectful",
+                },
+                app.session_state["sender_profiles"],
+            )
+            saved_profiles = json.loads(settings_file.read_text(encoding="utf-8"))
+            self.assertIn("Alice Wong", [profile["name"] for profile in saved_profiles])
+            self.assertTrue(any(
+                "Relationship & Tone Map saved." in str(item.value)
+                for item in app.success
+            ))
+        finally:
+            if previous_settings is None:
+                settings_file.unlink(missing_ok=True)
+            else:
+                settings_file.write_bytes(previous_settings)
+
+    def test_priority_codes_render_in_cards_and_review_popup(self):
+        app = AppTest.from_file(str(ROOT / "app.py"), default_timeout=20)
+        app.session_state["is_authenticated"] = True
+        app.session_state["category_display"] = {
+            "mode": "Priority labels",
+            "urgent": "P0",
+            "wait_until_morning": "P2",
+        }
+        app.run()
+
+        card_markup = "\n".join(str(item.value) for item in app.markdown)
+        self.assertIn("<strong>Category:</strong> P0", card_markup)
+        self.assertIn("<strong>Category:</strong> P2", card_markup)
+        self.assertIn("<strong>Category:</strong> P-1", card_markup)
+        self.assertIn("<strong>From:</strong> Teams", card_markup)
+
+        app.button(key="human-review-details-msg004").click().run()
+        popup_markup = "\n".join(str(item.value) for item in app.markdown)
+        self.assertIn('class="popup-category-review"', popup_markup)
+        self.assertIn("<strong>Category:</strong>", popup_markup)
+        self.assertIn("<span>P-1</span>", popup_markup)
+        self.assertIn("<strong>From: </strong>Whatsapp</p>", popup_markup)
+        self.assertEqual(app.exception, [])
+
+    def test_priority_code_settings_save_custom_mapping(self):
+        settings_file = ROOT / "data" / "category_display.json"
+        previous_settings = (
+            settings_file.read_bytes() if settings_file.exists() else None
+        )
+        try:
+            app = AppTest.from_file(str(ROOT / "app.py"), default_timeout=20)
+            app.session_state["is_authenticated"] = True
+            app.session_state["category_display_mode"] = "Priority labels"
+            app.session_state["urgent_priority"] = "P1"
+            app.run()
+
+            app.button(key="settings_button").click().run()
+            app.button(key="apply_category_labels").click().run()
+
+            self.assertEqual(
+                app.session_state["category_display"],
+                {"mode": "Priority labels", "urgent": "P1", "wait_until_morning": "P2"},
+            )
+            self.assertTrue(any(
+                "<strong>Category:</strong> P1" in str(item.value)
+                for item in app.markdown
+            ))
+            self.assertTrue(any(
+                "Category label settings applied." in str(item.value)
+                for item in app.success
+            ))
+            self.assertEqual(app.exception, [])
+        finally:
+            if previous_settings is None:
+                settings_file.unlink(missing_ok=True)
+            else:
+                settings_file.write_bytes(previous_settings)
+
+    def test_desktop_mobile_layout_switch_and_reply_feedback(self):
+        feedback_file = ROOT / "data" / "reply_feedback.json"
+        previous_feedback = feedback_file.read_bytes() if feedback_file.exists() else None
+        try:
+            app = AppTest.from_file(str(ROOT / "app.py"), default_timeout=20)
+            app.session_state["is_authenticated"] = True
+            app.session_state["reply_feedback"] = {
+                "ratings": {},
+                "style_overrides": {},
+            }
+            app.run()
+
+            self.assertEqual(app.session_state["layout_mode"], "desktop")
+            app.button(key="layout_toggle_button").click().run()
+            self.assertEqual(app.session_state["layout_mode"], "mobile")
+            self.assertIn("mobile-layout", [
+                node.key for node in app._tree if getattr(node, "key", None)
+            ])
+            self.assertTrue(any(
+                "--app-font-size: 14px" in str(item.value)
+                for item in app.markdown
+            ))
+            style_markup = "\n".join(str(item.value) for item in app.markdown)
+            self.assertIn(".st-key-layout_toggle_button [data-testid=\"stIconMaterial\"]", style_markup)
+            self.assertIn("font-size: 1.75rem !important", style_markup)
+            self.assertIn("[class*=\"st-key-feedback-up-\"] [data-testid=\"stButton\"] button > div", style_markup)
+            self.assertIn("display: flex !important;", style_markup)
+            self.assertIn("align-items: center !important;", style_markup)
+            self.assertIn("justify-content: center !important", style_markup)
+            self.assertIn("position: relative;", style_markup)
+            self.assertIn("position: absolute;", style_markup)
+            self.assertIn("top: 50%;", style_markup)
+            self.assertIn("left: 50%;", style_markup)
+            self.assertIn("transform: translate(-50%, -50%);", style_markup)
+            self.assertIn("height: 100%;", style_markup)
+            self.assertIn("width: 2.7rem;", style_markup)
+            self.assertIn("height: 2.7rem;", style_markup)
+            self.assertIn("border-radius: 50%;", style_markup)
+            app.button(key="layout_toggle_button").click().run()
+            self.assertEqual(app.session_state["layout_mode"], "desktop")
+
+            app.button(key="feedback-down-inbox-msg001").click().run()
+            self.assertEqual(
+                app.session_state["reply_feedback"]["style_overrides"]["project manager"],
+                "concise",
+            )
+            self.assertEqual(app.session_state["reply_feedback"]["ratings"]["msg001"]["rating"], "down")
+            self.assertTrue(any(
+                "Reply preference updated from your feedback." in str(item.value)
+                for item in app.info
+            ))
+            self.assertEqual(app.exception, [])
+        finally:
+            if previous_feedback is None:
+                feedback_file.unlink(missing_ok=True)
+            else:
+                feedback_file.write_bytes(previous_feedback)
 
     def test_queue_urgent_action_removes_message_and_marks_it_urgent(self):
         app = AppTest.from_file(str(ROOT / "app.py"), default_timeout=20)

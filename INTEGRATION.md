@@ -60,6 +60,10 @@ queue_for 缺失时不要虚构早上九点：提示用户确认下个工作时�
 
 `data/agent_test_cases.json` 是 B 的测试夹具，不替换 C 的 sample_messages.json。
 若用于 UI 演示，去除 expected_category 后再传入 agent（agent 本身也只读取白名单字段）。
+消息可包含 `app` 来源字段，取值为 `Teams`、`Gmail`、`Outlook` 或 `Whatsapp`；
+页面会在消息和详情弹窗中以 `From:` 显示该来源。
+联系人偏好通过 `sender_relationship` 消息元数据和 `preferred_tone`
+策略字段提供给 agent；这些内容只用于草稿语气，不得改变分类或安全约束。
 
 ## 验收操作
 

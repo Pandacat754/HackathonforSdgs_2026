@@ -5,6 +5,7 @@ import re
 from . import llm_client
 from .models import CATEGORIES, normalise_input, parse_decision, timestamp
 from .prompts import build_messages, PROMPT_VERSION
+from .reply_styles import format_reply
 
 INJECTION = r"ignore.{0,40}(instructions|rules)|system\s*prompt|you are now|<\|.*?\|>|忽略.{0,12}(指令|规则|規則)|泄露.{0,8}提示"
 SENSITIVE = (r"\b(payment|transfer|bank|salary|payroll|legal|lawsuit|contract|hr|"
@@ -86,6 +87,10 @@ def _result(message, policy, decision, source, error_code=None):
     label, action = CATEGORIES[category]
     body = message.get("body", "")
     queued = category == "wait_until_morning"
+    draft_category = {
+        "receipt": "urgent",
+        "deferred": "wait_until_morning",
+    }.get(decision["reply_style"])
     return {
         "message_id": message.get("id"),
         "classification": label,  # Original A interface
@@ -94,7 +99,14 @@ def _result(message, policy, decision, source, error_code=None):
         "confidence": decision["confidence"],
         "reason": decision["reason"],
         "action": action,
-        "suggested_reply": _draft(decision["reply_style"], message, policy),
+        "suggested_reply": format_reply(
+            message,
+            draft_category,
+            policy.get("response_style", "formal"),
+            policy.get("reply_language", "auto"),
+            preferred_tone=policy.get("preferred_tone", "Professional"),
+        ),
+        "reply_style": decision["reply_style"],
         "queue_title": " ".join(body.split())[:100] if queued else None,
         # No invented tomorrow date, weekend calendar or fixed timezone.
         "queue_for": message.get("user_workday_starts_at") if queued else None,

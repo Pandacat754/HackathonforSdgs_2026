@@ -2,21 +2,25 @@
   {
     "id": "msg001",
     "sender": "Project Manager",
+    "app": "Teams",
     "message": "Can you send me the final report tonight?"
   },
   {
     "id": "msg002",
     "sender": "Colleague",
+    "app": "Gmail",
     "message": "Team lunch moved to Friday."
   },
   {
     "id": "msg003",
     "sender": "CEO",
+    "app": "Outlook",
     "message": "Emergency meeting at 9 PM."
   },
   {
     "id": "msg004",
     "sender": "HR",
+    "app": "Whatsapp",
     "message": "Reminder to submit leave records next week."
   }
 ]

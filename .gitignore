@@ -15,7 +15,9 @@ env/
 
 # Streamlit secrets
 .streamlit/secrets.toml
+data/relationship_map.json
+data/category_display.json
+data/reply_feedback.json
 
 # Mac
 .DS_Store
-
