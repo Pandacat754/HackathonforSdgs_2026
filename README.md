@@ -116,6 +116,8 @@ Open **Settings** and toggle **Show Relationship & Tone Map** to show or hide
 the mind map and profile input form. Choose an existing contact to update or
 select **Add contact**, then enter a name, relationship type, and preferred
 tone. Saving immediately refreshes the mind map and any affected draft replies.
+Choose an existing contact and select **Delete contact** to remove it from the
+map; deleted contacts are not added again automatically.
 Relationship categories are parent nodes; contact nodes show the selected tone,
 with a tooltip explaining the tone choice. The form supports Family, Friend,
 Lecturer, Classmate, Teammate, Client, Manager, Colleague, and Other
@@ -128,8 +130,9 @@ suggestions in Settings. Lecturer, Friend, and Client profiles default to
 respectful/professional, casual/friendly, and formal/professional wording,
 respectively. Relationship and tone preferences are provided to the agent as
 personalization context; they never affect urgency or authorize commitments.
-Saved profiles are stored locally in `data/relationship_map.json`. Existing
-saved relationship-map profiles are migrated when loaded.
+Saved profiles and deleted-contact exclusions are stored locally in
+`data/relationship_map.json`. Existing saved relationship-map profiles are
+migrated when loaded.
 
 Use **Message category labels** to show standard category names or priority
 codes. Priority-code mode defaults to P0 for urgent, P2 for not urgent, and -1

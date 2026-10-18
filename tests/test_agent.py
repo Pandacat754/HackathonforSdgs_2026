@@ -649,12 +649,61 @@ class AgentTests(unittest.TestCase):
                 },
                 app.session_state["sender_profiles"],
             )
-            saved_profiles = json.loads(settings_file.read_text(encoding="utf-8"))
-            self.assertIn("Alice Wong", [profile["name"] for profile in saved_profiles])
+            saved_map = json.loads(settings_file.read_text(encoding="utf-8"))
+            self.assertIn(
+                "Alice Wong",
+                [profile["name"] for profile in saved_map["profiles"]],
+            )
             self.assertTrue(any(
                 "Relationship & Tone Map saved." in str(item.value)
                 for item in app.success
             ))
+        finally:
+            if previous_settings is None:
+                settings_file.unlink(missing_ok=True)
+            else:
+                settings_file.write_bytes(previous_settings)
+
+    def test_relationship_tone_map_deletes_contacts_persistently(self):
+        settings_file = ROOT / "data" / "relationship_map.json"
+        previous_settings = (
+            settings_file.read_bytes() if settings_file.exists() else None
+        )
+        try:
+            app = AppTest.from_file(str(ROOT / "app.py"), default_timeout=20)
+            app.session_state["is_authenticated"] = True
+            app.run()
+            app.button(key="settings_button").click().run()
+            app.toggle(key="show_relationship_map").set_value(True).run()
+            app.selectbox(key="relationship_profile_selection").select(
+                "Project Manager"
+            ).run()
+
+            app.button(key="delete_relationship_profile").click().run()
+
+            self.assertEqual(app.exception, [])
+            self.assertNotIn(
+                "Project Manager",
+                [profile["name"] for profile in app.session_state["sender_profiles"]],
+            )
+            saved_map = json.loads(settings_file.read_text(encoding="utf-8"))
+            self.assertIn("Project Manager", saved_map["excluded_senders"])
+            self.assertNotIn(
+                "Project Manager",
+                [profile["name"] for profile in saved_map["profiles"]],
+            )
+
+            reloaded_app = AppTest.from_file(str(ROOT / "app.py"), default_timeout=20)
+            reloaded_app.session_state["is_authenticated"] = True
+            reloaded_app.run()
+            self.assertEqual(reloaded_app.exception, [])
+            self.assertNotIn(
+                "Project Manager",
+                [
+                    profile["name"]
+                    for profile in reloaded_app.session_state["sender_profiles"]
+                ],
+            )
         finally:
             if previous_settings is None:
                 settings_file.unlink(missing_ok=True)

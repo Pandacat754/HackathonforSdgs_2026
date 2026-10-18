@@ -758,24 +758,74 @@ def validate_sender_profiles(rows):
     return profiles
 
 
+def validate_relationship_map(data):
+    if isinstance(data, list):
+        profile_rows = data
+        excluded_senders = []
+    elif isinstance(data, dict):
+        profile_rows = data.get("profiles")
+        excluded_senders = data.get("excluded_senders", [])
+        if not isinstance(profile_rows, list):
+            raise ValueError("Saved relationship map profiles must be a list.")
+        if not isinstance(excluded_senders, list):
+            raise ValueError("Saved excluded contacts must be a list.")
+    else:
+        raise ValueError("The saved relationship and tone map must be a list or object.")
+
+    profiles = validate_sender_profiles(profile_rows)
+    validated_exclusions = []
+    seen_exclusions = set()
+    for sender in excluded_senders:
+        if not isinstance(sender, str) or not sender.strip() or len(sender.strip()) > 200:
+            raise ValueError("Each excluded contact needs a name of 1–200 characters.")
+        sender = sender.strip()
+        sender_key = sender.casefold()
+        if sender_key in seen_exclusions:
+            raise ValueError(f"Excluded contact “{sender}” appears more than once.")
+        if any(profile["name"].casefold() == sender_key for profile in profiles):
+            raise ValueError(f"Contact “{sender}” is both saved and excluded.")
+        seen_exclusions.add(sender_key)
+        validated_exclusions.append(sender)
+    return profiles, validated_exclusions
+
+
 def load_sender_profiles(messages):
     senders = dict.fromkeys(str(message["sender"]) for message in messages)
+    excluded_senders = []
     if RELATIONSHIP_MAP_FILE.exists():
         try:
-            saved_profiles = validate_sender_profiles(
+            saved_profiles, excluded_senders = validate_relationship_map(
                 json.loads(RELATIONSHIP_MAP_FILE.read_text(encoding="utf-8"))
             )
         except (OSError, json.JSONDecodeError, ValueError) as error:
             st.error(f"Could not load the saved relationship and tone map: {error}")
             st.stop()
         known_senders = {profile["name"].casefold() for profile in saved_profiles}
+        known_senders.update(sender.casefold() for sender in excluded_senders)
         saved_profiles.extend(
             default_sender_profile(sender, messages)
             for sender in senders
             if sender.casefold() not in known_senders
         )
-        return saved_profiles
-    return [default_sender_profile(sender, messages) for sender in senders]
+    else:
+        saved_profiles = [
+            default_sender_profile(sender, messages) for sender in senders
+        ]
+    return saved_profiles, excluded_senders
+
+
+def write_relationship_map(profiles, excluded_senders):
+    RELATIONSHIP_MAP_FILE.write_text(
+        json.dumps(
+            {
+                "profiles": profiles,
+                "excluded_senders": excluded_senders,
+            },
+            ensure_ascii=False,
+            indent=2,
+        ) + "\n",
+        encoding="utf-8",
+    )
 
 
 def get_sender_profile(message, profiles):
@@ -788,6 +838,19 @@ def get_sender_profile(message, profiles):
 
 def with_sender_profile(message, profile):
     return {**message, "sender_relationship": profile["relationship_type"]}
+
+
+def refresh_sender_drafts(messages, profiles):
+    for message in messages:
+        analysis = st.session_state["message_analyses"].get(message["id"])
+        if not analysis:
+            continue
+        profile = get_sender_profile(message, profiles)
+        agent_message = with_sender_profile(message, profile)
+        policy = sender_policy(profile)
+        reply = generate_reply(agent_message, analysis["result"], policy)
+        analysis["result"]["suggested_reply"] = reply["suggested_reply"]
+        analysis["reply"] = reply
 
 
 def sender_policy(profile):
@@ -1118,7 +1181,12 @@ with DATA_FILE.open("r", encoding="utf-8") as f:
     messages = json.load(f)
 
 if "sender_profiles" not in st.session_state:
-    st.session_state["sender_profiles"] = load_sender_profiles(messages)
+    (
+        st.session_state["sender_profiles"],
+        st.session_state["excluded_sender_names"],
+    ) = load_sender_profiles(messages)
+if "excluded_sender_names" not in st.session_state:
+    st.session_state["excluded_sender_names"] = []
 if "category_display" not in st.session_state:
     st.session_state["category_display"] = load_category_display()
 if "reply_feedback" not in st.session_state:
@@ -1799,39 +1867,88 @@ if st.session_state["show_settings"]:
                         next_profiles.append(updated_profile)
                     else:
                         next_profiles[existing_index] = updated_profile
-                    next_profiles = validate_sender_profiles(next_profiles)
+                    next_profiles, next_excluded_senders = validate_relationship_map({
+                        "profiles": next_profiles,
+                        "excluded_senders": [
+                            sender
+                            for sender in st.session_state["excluded_sender_names"]
+                            if sender.casefold()
+                            != updated_profile["name"].casefold()
+                        ],
+                    })
                 except (OSError, ValueError) as error:
                     st.error(f"Could not save the Relationship & Tone Map: {error}")
                 else:
                     try:
-                        RELATIONSHIP_MAP_FILE.write_text(
-                            json.dumps(next_profiles, ensure_ascii=False, indent=2) + "\n",
-                            encoding="utf-8",
+                        write_relationship_map(
+                            next_profiles, next_excluded_senders
                         )
                     except OSError as error:
                         st.error(f"Could not save the Relationship & Tone Map: {error}")
                     else:
                         st.session_state["sender_profiles"] = next_profiles
-                        for message in messages:
-                            analysis = st.session_state["message_analyses"].get(
-                                message["id"]
-                            )
-                            if not analysis:
-                                continue
-                            profile = get_sender_profile(message, next_profiles)
-                            agent_message = with_sender_profile(message, profile)
-                            policy = sender_policy(profile)
-                            reply = generate_reply(
-                                agent_message, analysis["result"], policy
-                            )
-                            analysis["result"]["suggested_reply"] = (
-                                reply["suggested_reply"]
-                            )
-                            analysis["reply"] = reply
+                        st.session_state["excluded_sender_names"] = (
+                            next_excluded_senders
+                        )
+                        refresh_sender_drafts(messages, next_profiles)
                         st.session_state["settings_notice"] = (
                             "Relationship & Tone Map saved."
                         )
                         st.rerun()
+            if selected_profile:
+                st.caption(
+                    "Deleting a contact removes it from the map and prevents it "
+                    "from being added again automatically."
+                )
+                with st.form("relationship_profile_delete_form"):
+                    delete_relationship_profile = st.form_submit_button(
+                        "Delete contact",
+                        key="delete_relationship_profile",
+                        type="secondary",
+                    )
+                if delete_relationship_profile:
+                    next_profiles = [
+                        profile for profile in profiles
+                        if profile["name"].casefold()
+                        != selected_profile["name"].casefold()
+                    ]
+                    next_excluded_senders = [
+                        *st.session_state["excluded_sender_names"],
+                        selected_profile["name"],
+                    ]
+                    try:
+                        next_profiles, next_excluded_senders = (
+                            validate_relationship_map({
+                                "profiles": next_profiles,
+                                "excluded_senders": next_excluded_senders,
+                            })
+                        )
+                    except ValueError as error:
+                        st.error(
+                            f"Could not delete the contact from the Relationship "
+                            f"& Tone Map: {error}"
+                        )
+                    else:
+                        try:
+                            write_relationship_map(
+                                next_profiles, next_excluded_senders
+                            )
+                        except OSError as error:
+                            st.error(
+                                "Could not delete the contact from the "
+                                f"Relationship & Tone Map: {error}"
+                            )
+                        else:
+                            st.session_state["sender_profiles"] = next_profiles
+                            st.session_state["excluded_sender_names"] = (
+                                next_excluded_senders
+                            )
+                            refresh_sender_drafts(messages, next_profiles)
+                            st.session_state["settings_notice"] = (
+                                f'{selected_profile["name"]} was removed from the '
+                                "Relationship & Tone Map."
+                            )
+                            st.rerun()
         st.write("API credentials are not displayed here.")
 
 analyses = st.session_state["message_analyses"]
